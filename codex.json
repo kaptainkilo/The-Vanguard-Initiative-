@@ -1,0 +1,16 @@
+{
+  "origin": "Twenty years ago, first contact wasn't a handshake. It was a warning shot across an outer colony most of Earth didn't know existed yet. The United Earth Alliance formed committees. Helix Dynamics, already deep into human performance research, had a faster answer sitting on the shelf: not weapons, not machines — people, made more capable through discipline, training, and data. The Vanguard Initiative is that answer. Cheaper than a weapons program, faster than a fleet, and it scales — every operator who trains makes humanity measurably stronger.",
+  "command": "Command runs day-to-day operations — briefings, welcomes, reactions to what the community actually does. High Command sits above, unseen: the UEA/Helix Dynamics leadership tier that sets quotas, approves budgets, and occasionally hands down a directive that makes no practical sense but has to be followed anyway.",
+  "factions": [
+    {"name":"The Kharvax Swarm","sector":"The Hollow Reach","desc":"Overwhelming numbers, relentless, no negotiation. Insectoid hive-based attrition warfare. Best met with sheer sustained volume."},
+    {"name":"The Voss Directorate","sector":"The Meridian Line","desc":"Cold, disciplined, technologically superior — not more numerous, just more precise. A mirror of what humanity could become without Vanguard's consistency-over-perfection philosophy."},
+    {"name":"The Skarn Collective","sector":"The Bloom","desc":"Parasitic, corrupting, spreads through contested territory rather than invading outright. The fight here is containment, not a battle line."},
+    {"name":"The Renders","sector":"Scattered — no fixed territory","desc":"Decentralized raiders and opportunists. No central empire, no warning. They hit fast, wherever Vanguard looks weakest, then vanish."}
+  ],
+  "sectors": [
+    {"name":"The Hollow Reach","desc":"Dense, overrun, chaotic. Kharvax territory. Home to Kharvax Prime, site of Operation First Light."},
+    {"name":"The Meridian Line","desc":"Ordered, precise, unsettling in its cleanliness. Voss Directorate territory."},
+    {"name":"The Bloom","desc":"Overgrown, spreading, uneasy. Skarn Collective territory — named a little too prettily on purpose."},
+    {"name":"The Open Reaches","desc":"Not a Sector so much as scattered activity along the Frontier's edges. Render territory, if they can be said to hold territory at all."}
+  ]
+}
