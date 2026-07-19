@@ -1,0 +1,47 @@
+{
+  "ageDivisions": ["Cadet","Corps","Veteran"],
+  "specializations": [
+    {"name":"Heavy Assault","desc":"Strength and physical capability. Strength, power, load capacity."},
+    {"name":"Recon","desc":"Endurance and adaptability. Running, mobility, conditioning."},
+    {"name":"Guardian","desc":"Resilience and support. Recovery, health, helping others."},
+    {"name":"Engineer","desc":"Skills and problem solving. Building, repair, technical skills."},
+    {"name":"Command","desc":"Leadership. Squad leadership, mentoring, community contribution."}
+  ],
+  "rankOrder": ["Recruit","Operator","Senior Operator","Specialist","Vanguard"],
+  "rankRequirements": {
+    "Operator":        { "ors": 50, "daysActive": 14,  "campaigns": 0 },
+    "Senior Operator":  { "ors": 65, "daysActive": 45,  "campaigns": 1 },
+    "Specialist":       { "ors": 75, "daysActive": 90,  "campaigns": 2 },
+    "Vanguard":         { "ors": 90, "daysActive": 180, "campaigns": 3 }
+  },
+  "rankUpLines": {
+    "Operator": "Recruit no more. Command has reviewed your file — consistency, not perfection, and it shows. Welcome to full operational status, Operator.",
+    "Senior Operator": "Multiple Campaigns behind you now. Command doesn't hand out 'Senior' lightly. You've earned the weight of that word.",
+    "Specialist": "Command has flagged your file for advanced standing. Whatever track you choose next, you've already proven you finish what you start.",
+    "Vanguard": "There's a reason this rank has a name and not just a number. You are what the Initiative was built to create. Command salutes you."
+  },
+  "commandQuips": [
+    "High Command wants a report on 'operator morale.' I told them morale is high. I have no idea if that's true. Please make it true.",
+    "Reminder from Command: the Kharvax do not observe weekends. Neither, technically, do push-ups.",
+    "High Command approved a new commendation for 'Exceptional Hydration.' Please drink water. Please also stop asking why.",
+    "Command has been asked to remind everyone that 'creative interpretation' of a Protocol still counts, as long as the work actually happened.",
+    "Somewhere in the Hollow Reach, a Kharvax colony has no idea today is leg day. Let's keep it that way.",
+    "High Command sent a 40-page memo about 'synergy.' Command read page one. Command believes in you regardless.",
+    "Today's briefing is short: show up, log it, move on. The Swarm respects consistency more than heroics."
+  ],
+  "locationCategories": [
+    {"id":"pushups","label":"Push-Ups","unit":"push-ups"},
+    {"id":"squats","label":"Squats","unit":"squats"},
+    {"id":"pullups","label":"Pull-Ups","unit":"pull-ups"},
+    {"id":"cardio_minutes","label":"Cardio Minutes","unit":"minutes"},
+    {"id":"generic","label":"Generic Reps","unit":"reps"},
+    {"id":"support","label":"Support Actions (async, engagement-type)","unit":"actions"}
+  ],
+  "campaignBaseRates": {"pushups":125,"squats":100,"pullups":40,"cardio_minutes":50,"generic":100,"support":1},
+  "categoryToKeyword": {"pushups":"push-up","squats":"squat","cardio_minutes":"cardio minute","pullups":"pull-up"},
+  "statusDecay": {
+    "note": "Status is computed from the WORSE of two checks: days since your last log, and your rolling 14-day logging rate. See app source for exact tiers.",
+    "gapDaysTiers": {"Active":"0-7","Alert":"8-14","Standby":"15-30","Reserve":"31-60","DeepReserve":"60+"},
+    "rollingRateTiers": {"Active":">=50%","Alert":">=30%","Standby":">=15%","Reserve":">0%","DeepReserve":"0%"}
+  }
+}
