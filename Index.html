@@ -206,6 +206,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script type="text/babel" data-presets="react">
 
@@ -762,89 +763,147 @@ function Avatar(props) {
   return <div className="avatar" style={{width:s,height:s,fontSize:s*0.38,background:op.avatarColor}}>{op.callsign.charAt(0)}</div>;
 }
 
-function Login({ operators, onLogin, onEnroll }) {
-  const [enrolling, setEnrolling] = useState(false);
-  const [pinTarget, setPinTarget] = useState(null);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-  function tryLogin(op) { if (op.pin) { setPinTarget(op); setPinInput(''); setPinError(''); } else onLogin(op.id); }
-  function submitPin() { if (pinInput === pinTarget.pin) onLogin(pinTarget.id); else setPinError('Incorrect access code.'); }
+// ============================================================
+// SUPABASE CLIENT + DATA MAPPING LAYER
+// Converts between Postgres snake_case rows and the app's existing
+// camelCase JS shapes, so every UI component below is unchanged.
+// ============================================================
+const SUPABASE_URL = 'https://owdszpgcfswrcuifbpzv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93ZHN6cGdjZnN3cmN1aWZicHp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMjE0ODQsImV4cCI6MjA5OTg5NzQ4NH0.DKnyhXm6CxLQZkKwvLZJaxaqGriNdcfCJsNZMmutlJY';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function rowToOperator(p, habits) {
+  return {
+    id: p.id, callsign: p.callsign, realName: p.real_name || '', idNum: p.id_num, joinDate: p.join_date,
+    ageDivision: p.age_division, specialization: p.specialization, squad: p.squad, privacy: p.privacy,
+    avatarColor: p.avatar_color, weeklyTarget: p.weekly_target, isAdmin: p.is_admin, onboarded: p.onboarded,
+    baseline: p.baseline, previousBaseline: p.previous_baseline, currentDeploymentId: p.current_deployment_id,
+    reinforcementDropsAvailable: p.reinforcement_drops_available, mcpAtLastReinforcement: p.mcp_at_last_reinforcement,
+    lastSeenRank: p.last_seen_rank, customProtocols: p.custom_protocols || [], habits: habits || [],
+  };
+}
+const OP_FIELD_MAP = { realName:'real_name', ageDivision:'age_division', specialization:'specialization', squad:'squad',
+  privacy:'privacy', avatarColor:'avatar_color', weeklyTarget:'weekly_target', isAdmin:'is_admin', onboarded:'onboarded',
+  baseline:'baseline', previousBaseline:'previous_baseline', currentDeploymentId:'current_deployment_id',
+  reinforcementDropsAvailable:'reinforcement_drops_available', mcpAtLastReinforcement:'mcp_at_last_reinforcement',
+  lastSeenRank:'last_seen_rank', customProtocols:'custom_protocols', callsign:'callsign' };
+function operatorToRowPatch(patch) {
+  const row = {};
+  Object.keys(patch).forEach(k => { if (OP_FIELD_MAP[k]) row[OP_FIELD_MAP[k]] = patch[k]; });
+  return row;
+}
+
+function rowToLocation(l) { return { id: l.id, name: l.name, objective: l.objective, category: l.category, unit: l.unit, manualTarget: l.manual_target }; }
+function rowToCampaign(c, locs) {
+  return { id: c.id, name: c.name, threat: c.threat, sector: c.sector, startDate: c.start_date,
+    joinWindowDays: c.join_window_days, durationDays: c.duration_days, lockedAt: c.locked_at,
+    lockedTargets: c.locked_targets, lockedDeployedCount: c.locked_deployed_count,
+    deployedOperatorIds: c.deployed_operator_ids || [], reinforcementsUsed: c.reinforcements_used,
+    resolved: c.resolved, locations: (locs||[]).map(rowToLocation) };
+}
+const CAMP_FIELD_MAP = { name:'name', threat:'threat', sector:'sector', joinWindowDays:'join_window_days',
+  durationDays:'duration_days', lockedAt:'locked_at', lockedTargets:'locked_targets',
+  lockedDeployedCount:'locked_deployed_count', deployedOperatorIds:'deployed_operator_ids',
+  reinforcementsUsed:'reinforcements_used', resolved:'resolved' };
+function campaignToRowPatch(patch) {
+  const row = {};
+  Object.keys(patch).forEach(k => { if (CAMP_FIELD_MAP[k]) row[CAMP_FIELD_MAP[k]] = patch[k]; });
+  return row;
+}
+
+function rowToLog(l) {
+  return { id: l.id, operatorId: l.operator_id, type: l.type, date: l.date, timestamp: Number(l.timestamp),
+    protocolLabel: l.protocol_label, exercise: l.exercise, variant: l.variant, category: l.category, unit: l.unit,
+    sets: l.sets, totalValue: l.total_value !== null ? Number(l.total_value) : null, detail: l.detail,
+    campaignId: l.campaign_id, locationId: l.location_id, amount: l.amount !== null ? Number(l.amount) : null,
+    source: l.source, sourceExercise: l.source_exercise, habitId: l.habit_id };
+}
+function logToRow(l) {
+  return { id: l.id, operator_id: l.operatorId, type: l.type, date: l.date, timestamp: l.timestamp,
+    protocol_label: l.protocolLabel || null, exercise: l.exercise || null, variant: l.variant || null,
+    category: l.category || null, unit: l.unit || null, sets: l.sets || null,
+    total_value: l.totalValue !== undefined ? l.totalValue : null, detail: l.detail || null,
+    campaign_id: l.campaignId || null, location_id: l.locationId || null,
+    amount: l.amount !== undefined ? l.amount : null, source: l.source || null,
+    source_exercise: l.sourceExercise || null, habit_id: l.habitId || null };
+}
+function rowToChat(m) { return { id: m.id, authorId: m.author_id, authorName: m.author_name, isCommand: m.is_command, text: m.text, timestamp: Number(m.timestamp) }; }
+function chatToRow(m) { return { id: m.id, author_id: m.authorId, author_name: m.authorName, is_command: m.isCommand, text: m.text, timestamp: m.timestamp }; }
+function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date }; }
+function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body }; }
+
+async function seedDefaultCampaign() {
+  const seed = DEFAULT_CAMPAIGN_SEED;
+  const { data: camp, error: e1 } = await sb.from('campaigns').insert({
+    name: seed.name, threat: seed.threat, sector: seed.sector, start_date: todayStr(),
+    join_window_days: seed.joinWindowDays, duration_days: seed.durationDays,
+  }).select().single();
+  if (e1) { console.error(e1); return null; }
+  const locRows = seed.locations.map(l => ({ campaign_id: camp.id, name: l.name, objective: l.objective, category: l.category, unit: l.unit, manual_target: l.manualTarget }));
+  const { data: locs } = await sb.from('locations').insert(locRows).select();
+  return rowToCampaign(camp, locs);
+}
+
+// ============================================================
+// AUTH-BASED LOGIN (replaces the PIN roster)
+// ============================================================
+function Login({ onAuthed }) {
+  const [mode, setMode] = useState('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [callsign, setCallsign] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirmNotice, setConfirmNotice] = useState(false);
+
+  async function signIn() {
+    setError(''); setBusy(true);
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) setError(error.message);
+    else onAuthed();
+  }
+  async function signUp() {
+    setError(''); setBusy(true);
+    if (!callsign.trim()) { setError('Callsign is required.'); setBusy(false); return; }
+    const { data, error } = await sb.auth.signUp({ email, password, options: { data: { callsign: callsign.trim().toUpperCase() } } });
+    setBusy(false);
+    if (error) { setError(error.message); return; }
+    if (data.session) onAuthed();
+    else setConfirmNotice(true);
+  }
+
+  if (confirmNotice) {
+    return (
+      <div className="login-wrap">
+        <div className="login-card">
+          <div className="panel">
+            <div className="disp" style={{fontSize:18,marginBottom:12}}>Check Your Email</div>
+            <div style={{fontSize:13,lineHeight:1.7,color:'var(--text-dim)'}}>Command sent a confirmation link to <strong>{email}</strong>. Confirm your address, then come back and sign in.</div>
+            <button className="ghost" style={{marginTop:16,width:'100%'}} onClick={()=>{setConfirmNotice(false); setMode('signin');}}>Back to Sign In</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="login-wrap">
       <div className="login-card">
         <div className="disp login-title">Vanguard // Personnel Terminal</div>
         <div className="login-sub">United Earth Alliance — Access Required</div>
-        <div className="roster-grid">
-          {operators.map(op => (
-            <div key={op.id} className="roster-card" onClick={() => tryLogin(op)}>
-              <Avatar op={op} />
-              <div className="roster-name disp">{op.callsign}</div>
-              <div className="roster-id">{op.idNum}</div>
-            </div>
-          ))}
-        </div>
-        <button className="primary" style={{width:'100%'}} onClick={() => setEnrolling(true)}>Enroll New Operator</button>
-        <div className="info-note">Access-code login only for now — full username/password authentication is planned once Vanguard has a real backend.</div>
-        {pinTarget && (
-          <div className="modal-overlay" onClick={() => setPinTarget(null)}>
-            <div className="modal" onClick={e=>e.stopPropagation()}>
-              <div className="disp" style={{fontSize:16,marginBottom:14}}>Access Code — {pinTarget.callsign}</div>
-              <input type="password" maxLength="4" value={pinInput} onChange={e=>setPinInput(e.target.value)} placeholder="****" />
-              {pinError && <div className="threat" style={{fontSize:12,marginTop:8}}>{pinError}</div>}
-              <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:16}}>
-                <button className="ghost" onClick={()=>setPinTarget(null)}>Cancel</button>
-                <button className="primary" onClick={submitPin}>Access</button>
-              </div>
-            </div>
+        <div className="panel">
+          <div className="radio-group" style={{marginBottom:16}}>
+            <div className={"radio-opt"+(mode==='signin'?' sel':'')} onClick={()=>{setMode('signin'); setError('');}}>Sign In</div>
+            <div className={"radio-opt"+(mode==='signup'?' sel':'')} onClick={()=>{setMode('signup'); setError('');}}>New Operator</div>
           </div>
-        )}
-        {enrolling && <EnrollModal onClose={()=>setEnrolling(false)} onEnroll={(op)=>{onEnroll(op); setEnrolling(false);}} existingCount={operators.length} />}
-      </div>
-    </div>
-  );
-}
-
-function EnrollModal({ onClose, onEnroll, existingCount }) {
-  const [callsign, setCallsign] = useState('');
-  const [realName, setRealName] = useState('');
-  const [ageDivision, setAgeDivision] = useState('Corps');
-  const [weeklyTarget, setWeeklyTarget] = useState(4);
-  const [pin, setPin] = useState('');
-  const [color, setColor] = useState(AVATAR_COLORS[existingCount % AVATAR_COLORS.length]);
-  const [isAdmin, setIsAdmin] = useState(existingCount === 0);
-  function submit() {
-    if (!callsign.trim()) return;
-    onEnroll({
-      id: 'op_' + Date.now(), callsign: callsign.trim().toUpperCase(), realName: realName.trim(),
-      idNum: 'VAN-' + (existingCount + 1), joinDate: todayStr(), ageDivision: ageDivision, specialization: null,
-      squad: 'Alpha Cell', privacy: 'Public', avatarColor: color, pin: pin || null, weeklyTarget: Number(weeklyTarget) || 3,
-      isAdmin: isAdmin, onboarded: false, baseline: null, previousBaseline: null,
-      currentDeploymentId: null, reinforcementDropsAvailable: 0, mcpAtLastReinforcement: 0,
-      habits: [], lastSeenRank: 'Recruit', customProtocols: [],
-    });
-  }
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="disp" style={{fontSize:18,marginBottom:16}}>New Operator Enrollment</div>
-        <div className="field"><label>Callsign (required)</label><input type="text" value={callsign} onChange={e=>setCallsign(e.target.value)} placeholder="e.g. Iron Wolf" /></div>
-        <div className="field"><label>Real Name (optional)</label><input type="text" value={realName} onChange={e=>setRealName(e.target.value)} /></div>
-        <div className="field"><label>Age Division</label>
-          <div className="radio-group">{AGE_DIVISIONS.map(a => <div key={a} className={"radio-opt"+(ageDivision===a?' sel':'')} onClick={()=>setAgeDivision(a)}>{a}</div>)}</div>
-        </div>
-        <div className="info-note" style={{marginBottom:16}}>Specialization Tracks unlock at Operator rank — not chosen at enrollment.</div>
-        <div className="field"><label>Weekly Protocol Target (sessions/week)</label><input type="number" value={weeklyTarget} onChange={e=>setWeeklyTarget(e.target.value)} /></div>
-        <div className="field"><label>Avatar Color</label>
-          <div className="swatch-row">{AVATAR_COLORS.map(c => <div key={c} className={"swatch"+(color===c?' sel':'')} style={{background:c}} onClick={()=>setColor(c)}></div>)}</div>
-        </div>
-        <div className="field"><label>Access Code (optional, 4 digits)</label><input type="password" maxLength="4" value={pin} onChange={e=>setPin(e.target.value)} placeholder="Leave blank for none" /></div>
-        <div className="field" style={{display:'flex',alignItems:'center',gap:8}}>
-          <input type="checkbox" id="isadmin" checked={isAdmin} onChange={e=>setIsAdmin(e.target.checked)} style={{width:16,height:16}} />
-          <label htmlFor="isadmin" style={{marginBottom:0,textTransform:'none',fontSize:12}}>Register as Command (Admin)</label>
-        </div>
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:8}}>
-          <button className="ghost" onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={submit} disabled={!callsign.trim()}>Activate</button>
+          <div className="field"><label>Email</label><input type="text" value={email} onChange={e=>setEmail(e.target.value)} /></div>
+          {mode==='signup' && <div className="field"><label>Callsign</label><input type="text" value={callsign} onChange={e=>setCallsign(e.target.value)} placeholder="e.g. Iron Wolf" /></div>}
+          <div className="field"><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} /></div>
+          {error && <div className="threat" style={{fontSize:12,marginBottom:12}}>{error}</div>}
+          <button className="primary" style={{width:'100%'}} disabled={busy} onClick={mode==='signin'?signIn:signUp}>
+            {busy ? 'Working...' : (mode==='signin' ? 'Access Terminal' : 'Enroll')}
+          </button>
         </div>
       </div>
     </div>
@@ -924,8 +983,7 @@ function MiniChat({ chat, activeOp, onGoComms }) {
   return (
     <div className="mini-chat">
       <div className="mini-chat-head" onClick={()=>setCollapsed(!collapsed)}>
-        <span>Comms — Alpha Cell</span>
-        <span>{collapsed ? '▲' : '▼'}</span>
+        <span>Comms — Alpha Cell</span><span>{collapsed ? '▲' : '▼'}</span>
       </div>
       {!collapsed && (
         <div>
@@ -947,143 +1005,224 @@ function MiniChat({ chat, activeOp, onGoComms }) {
   );
 }
 
+async function fetchAllData() {
+  const { data: profileRows } = await sb.from('profiles').select('*');
+  const { data: habitRows } = await sb.from('habits').select('*');
+  let ops = (profileRows||[]).map(p => rowToOperator(p, (habitRows||[]).filter(h=>h.operator_id===p.id).map(rowToHabit)));
+
+  const { data: campRows } = await sb.from('campaigns').select('*');
+  const { data: locRows } = await sb.from('locations').select('*');
+  let camps = (campRows||[]).map(c => rowToCampaign(c, (locRows||[]).filter(l=>l.campaign_id===c.id)));
+  if (camps.length === 0) {
+    const seeded = await seedDefaultCampaign();
+    if (seeded) camps = [seeded];
+  }
+
+  const { data: logRows } = await sb.from('logs').select('*');
+  const lgs = (logRows||[]).map(rowToLog);
+
+  const { data: chatRows } = await sb.from('chat_messages').select('*').order('timestamp', {ascending:true});
+  const ch = (chatRows||[]).map(rowToChat);
+
+  const { data: codexRows } = await sb.from('codex_entries').select('*');
+  const cx = (codexRows && codexRows.length) ? codexRows.map(rowToCodex) : DEFAULT_CODEX_ENTRIES;
+
+  // auto-lock join windows / auto-resolve campaigns, writing back any changes
+  for (let i = 0; i < camps.length; i++) {
+    let c = camps[i];
+    if (!c.lockedAt && daysBetween(c.startDate, todayStr()) >= c.joinWindowDays) {
+      const count = Math.max(1, c.deployedOperatorIds.length);
+      const targets = {}; c.locations.forEach(loc => { targets[loc.id] = locationTarget(c, loc); });
+      await sb.from('campaigns').update({ locked_at: todayStr(), locked_targets: targets, locked_deployed_count: count }).eq('id', c.id);
+      c = Object.assign({}, c, { lockedAt: todayStr(), lockedTargets: targets, lockedDeployedCount: count });
+      camps[i] = c;
+    }
+    if (!c.resolved && c.lockedAt) {
+      const locProg = computeLocationProgress(c, lgs);
+      const pct = computePlanetControl(locProg);
+      if (pct >= 100) { await sb.from('campaigns').update({resolved:'success'}).eq('id', c.id); camps[i] = Object.assign({}, c, {resolved:'success'}); }
+      else if (daysBetween(c.startDate, todayStr()) >= c.durationDays) { await sb.from('campaigns').update({resolved:'failed'}).eq('id', c.id); camps[i] = Object.assign({}, c, {resolved:'failed'}); }
+    }
+  }
+
+  return { ops, camps, lgs, ch, cx };
+}
+
 function App() {
   const [loaded, setLoaded] = useState(false);
+  const [session, setSession] = useState(null);
   const [operators, setOperators] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [logs, setLogs] = useState([]);
   const [chat, setChat] = useState([]);
   const [codexEntries, setCodexEntries] = useState([]);
-  const [activeOpId, setActiveOpId] = useState(null);
   const [tab, setTab] = useState('command');
   const [showReset, setShowReset] = useState(false);
   const [viewDossierId, setViewDossierId] = useState(null);
   const [rankUpModal, setRankUpModal] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      const ops = await loadShared('vanguard-operators', []);
-      let camps = await loadShared('vanguard-campaigns', null);
-      if (!camps) {
-        const legacy = await loadShared('vanguard-campaign', null);
-        if (legacy) camps = [Object.assign({}, DEFAULT_CAMPAIGN_SEED, {startDate: legacy.startDate, deployedOperatorIds: ops.map(o=>o.id)})];
-        else camps = [Object.assign({}, DEFAULT_CAMPAIGN_SEED, {startDate: todayStr()})];
-        await saveShared('vanguard-campaigns', camps);
-      }
-      const lg = await loadShared('vanguard-logs', []);
-      const ch = await loadShared('vanguard-chat', []);
-      let cx = await loadShared('vanguard-codex', null);
-      if (!cx) { cx = DEFAULT_CODEX_ENTRIES; await saveShared('vanguard-codex', cx); }
-
-      let changed = false;
-      camps = camps.map(c => {
-        let cc = c;
-        if (!cc.lockedAt && daysBetween(cc.startDate, todayStr()) >= cc.joinWindowDays) {
-          const count = Math.max(1, cc.deployedOperatorIds.length);
-          const targets = {};
-          cc.locations.forEach(loc => { targets[loc.id] = locationTarget(cc, loc); });
-          cc = Object.assign({}, cc, { lockedAt: todayStr(), lockedTargets: targets, lockedDeployedCount: count }); changed = true;
-        }
-        if (!cc.resolved && cc.lockedAt) {
-          const locProg = computeLocationProgress(cc, lg);
-          const pct = computePlanetControl(locProg);
-          if (pct >= 100) { cc = Object.assign({}, cc, {resolved:'success'}); changed = true; }
-          else if (daysBetween(cc.startDate, todayStr()) >= cc.durationDays) { cc = Object.assign({}, cc, {resolved:'failed'}); changed = true; }
-        }
-        return cc;
-      });
-      if (changed) await saveShared('vanguard-campaigns', camps);
-
-      let opsChanged = false;
-      const migratedOps = ops.map(o => {
-        const patch = {};
-        if (o.habits === undefined) patch.habits = [];
-        if (o.lastSeenRank === undefined) patch.lastSeenRank = 'Recruit';
-        if (o.customProtocols === undefined) patch.customProtocols = [];
-        if (Object.keys(patch).length) { opsChanged = true; return Object.assign({}, o, patch); }
-        return o;
-      });
-      if (opsChanged) await saveShared('vanguard-operators', migratedOps);
-
-      setOperators(migratedOps); setCampaigns(camps); setLogs(lg); setChat(ch); setCodexEntries(cx); setLoaded(true);
-    })();
+    sb.auth.getSession().then(({data}) => setSession(data.session));
+    const { data: sub } = sb.auth.onAuthStateChange((_event, sess) => setSession(sess));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return;
-    const iv = setInterval(async () => { const ch = await loadShared('vanguard-chat', []); setChat(ch); }, 4000);
-    return () => clearInterval(iv);
-  }, [loaded]);
+  async function refetchAll() {
+    const { ops, camps, lgs, ch, cx } = await fetchAllData();
+    setOperators(ops); setCampaigns(camps); setLogs(lgs); setChat(ch); setCodexEntries(cx);
+  }
 
-  async function addLogs(entries) { const newLogs = logs.concat(entries); setLogs(newLogs); await saveShared('vanguard-logs', newLogs); }
-  async function enrollOperator(op) { const newOps = operators.concat([op]); setOperators(newOps); await saveShared('vanguard-operators', newOps); setActiveOpId(op.id); }
-  async function updateOperator(updatedOp) { const newOps = operators.map(o => o.id === updatedOp.id ? updatedOp : o); setOperators(newOps); await saveShared('vanguard-operators', newOps); }
-  async function updateOperators(newOps) { setOperators(newOps); await saveShared('vanguard-operators', newOps); }
-  async function updateCampaigns(newCamps) { setCampaigns(newCamps); await saveShared('vanguard-campaigns', newCamps); }
-  async function sendChat(msg) { const newChat = chat.concat([msg]); setChat(newChat); await saveShared('vanguard-chat', newChat); }
-  async function updateCodex(newEntries) { setCodexEntries(newEntries); await saveShared('vanguard-codex', newEntries); }
+  useEffect(() => {
+    if (!session) { setLoaded(false); return; }
+    (async () => { await refetchAll(); setLoaded(true); })();
+  }, [session]);
+
+  // realtime chat subscription
+  useEffect(() => {
+    if (!session) return;
+    const channel = sb.channel('chat-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        setChat(prev => prev.some(m=>m.id===payload.new.id) ? prev : prev.concat([rowToChat(payload.new)]));
+      })
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [session]);
+
+  async function addLogs(entries) {
+    await sb.from('logs').insert(entries.map(logToRow));
+    await refetchAll();
+  }
+  async function updateOperator(updatedOp) {
+    const old = operators.find(o=>o.id===updatedOp.id) || {};
+    const patch = {};
+    Object.keys(OP_FIELD_MAP).forEach(k => { if (JSON.stringify(updatedOp[k]) !== JSON.stringify(old[k])) patch[k] = updatedOp[k]; });
+    if (Object.keys(patch).length) await sb.from('profiles').update(operatorToRowPatch(patch)).eq('id', updatedOp.id);
+    await refetchAll();
+  }
+  async function updateOperators(newOps) {
+    const removed = operators.filter(o => !newOps.some(n=>n.id===o.id));
+    for (const r of removed) await sb.from('profiles').delete().eq('id', r.id);
+    for (const o of newOps) {
+      const old = operators.find(x=>x.id===o.id);
+      if (!old) continue;
+      const patch = {};
+      Object.keys(OP_FIELD_MAP).forEach(k => { if (JSON.stringify(o[k]) !== JSON.stringify(old[k])) patch[k]=o[k]; });
+      if (Object.keys(patch).length) await sb.from('profiles').update(operatorToRowPatch(patch)).eq('id', o.id);
+    }
+    await refetchAll();
+  }
+  async function updateCampaigns(newCamps) {
+    for (const nc of newCamps) {
+      const old = campaigns.find(c=>c.id===nc.id);
+      if (!old) {
+        const { data: inserted } = await sb.from('campaigns').insert({
+          name: nc.name, threat: nc.threat, sector: nc.sector, start_date: nc.startDate,
+          join_window_days: nc.joinWindowDays, duration_days: nc.durationDays,
+        }).select().single();
+        if (inserted && nc.locations.length) {
+          await sb.from('locations').insert(nc.locations.map(l => ({ campaign_id: inserted.id, name:l.name, objective:l.objective, category:l.category, unit:l.unit, manual_target:l.manualTarget })));
+        }
+        continue;
+      }
+      const patch = {};
+      Object.keys(CAMP_FIELD_MAP).forEach(k => { if (JSON.stringify(nc[k]) !== JSON.stringify(old[k])) patch[k]=nc[k]; });
+      if (Object.keys(patch).length) await sb.from('campaigns').update(campaignToRowPatch(patch)).eq('id', nc.id);
+      const newLocIds = new Set(nc.locations.map(l=>l.id));
+      const removedLocs = old.locations.filter(l=>!newLocIds.has(l.id));
+      for (const rl of removedLocs) await sb.from('locations').delete().eq('id', rl.id);
+      for (const nl of nc.locations) {
+        const oldLoc = old.locations.find(l=>l.id===nl.id);
+        if (!oldLoc) await sb.from('locations').insert({campaign_id: nc.id, name:nl.name, objective:nl.objective, category:nl.category, unit:nl.unit, manual_target:nl.manualTarget});
+        else if (JSON.stringify(oldLoc)!==JSON.stringify(nl)) await sb.from('locations').update({name:nl.name, objective:nl.objective, category:nl.category, unit:nl.unit, manual_target:nl.manualTarget}).eq('id', nl.id);
+      }
+    }
+    await refetchAll();
+  }
+  async function sendChat(msg) {
+    await sb.from('chat_messages').insert(chatToRow(msg));
+    // realtime subscription will pick up the insert; no need to refetch or setChat here
+  }
+  async function updateCodex(newEntries) {
+    const old = codexEntries;
+    const removed = old.filter(e => !newEntries.some(n=>n.id===e.id));
+    for (const r of removed) await sb.from('codex_entries').delete().eq('id', r.id);
+    for (const e of newEntries) {
+      const oldE = old.find(x=>x.id===e.id);
+      if (!oldE) await sb.from('codex_entries').insert({ category: e.category, title: e.title, body: e.body });
+      else if (oldE.title!==e.title || oldE.body!==e.body) await sb.from('codex_entries').update({title:e.title, body:e.body}).eq('id', e.id);
+    }
+    await refetchAll();
+  }
   async function resetAll() {
-    const camps = [Object.assign({}, DEFAULT_CAMPAIGN_SEED, {startDate: todayStr()})];
-    setCampaigns(camps); setLogs([]); setChat([]);
-    await saveShared('vanguard-campaigns', camps); await saveShared('vanguard-logs', []); await saveShared('vanguard-chat', []);
-    const clearedOps = operators.map(o => Object.assign({}, o, {currentDeploymentId:null, reinforcementDropsAvailable:0, mcpAtLastReinforcement:0, lastSeenRank:'Recruit'}));
-    setOperators(clearedOps); await saveShared('vanguard-operators', clearedOps);
+    await sb.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await sb.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    for (const c of campaigns) await sb.from('campaigns').delete().eq('id', c.id);
+    for (const o of operators) await sb.from('profiles').update({ current_deployment_id: null, reinforcement_drops_available: 0, mcp_at_last_reinforcement: 0, last_seen_rank: 'Recruit' }).eq('id', o.id);
+    await refetchAll();
     setShowReset(false);
   }
   async function deployToCampaign(op, camp) {
     if (op.currentDeploymentId) return;
     const phase = campaignPhase(camp);
-    let newCamps = campaigns;
     if (phase === 'recruiting') {
-      newCamps = campaigns.map(c => c.id===camp.id ? Object.assign({}, c, {deployedOperatorIds: c.deployedOperatorIds.concat([op.id])}) : c);
+      await sb.from('campaigns').update({ deployed_operator_ids: camp.deployedOperatorIds.concat([op.id]) }).eq('id', camp.id);
+      await sb.from('profiles').update({ current_deployment_id: camp.id }).eq('id', op.id);
     } else if (phase === 'active') {
       const capMax = Math.floor(0.2 * camp.lockedDeployedCount);
       if (op.reinforcementDropsAvailable < 1 || camp.reinforcementsUsed >= capMax) return;
-      newCamps = campaigns.map(c => c.id===camp.id ? Object.assign({}, c, {deployedOperatorIds: c.deployedOperatorIds.concat([op.id]), reinforcementsUsed: c.reinforcementsUsed + 1}) : c);
-      await updateOperator(Object.assign({}, op, {currentDeploymentId: camp.id, reinforcementDropsAvailable: op.reinforcementDropsAvailable - 1}));
-      setCampaigns(newCamps); await saveShared('vanguard-campaigns', newCamps);
-      return;
-    } else { return; }
-    await updateOperator(Object.assign({}, op, {currentDeploymentId: camp.id}));
-    setCampaigns(newCamps); await saveShared('vanguard-campaigns', newCamps);
+      await sb.from('campaigns').update({ deployed_operator_ids: camp.deployedOperatorIds.concat([op.id]), reinforcements_used: camp.reinforcementsUsed + 1 }).eq('id', camp.id);
+      await sb.from('profiles').update({ current_deployment_id: camp.id, reinforcement_drops_available: op.reinforcementDropsAvailable - 1 }).eq('id', op.id);
+    } else return;
+    await refetchAll();
   }
-  async function undeploy(op) { await updateOperator(Object.assign({}, op, {currentDeploymentId: null})); }
-  async function claimReinforcement(op) { await updateOperator(Object.assign({}, op, {reinforcementDropsAvailable: 1, mcpAtLastReinforcement: nonCampaignMCP(op.id, logs)})); }
-  async function addHabit(op, name) { await updateOperator(Object.assign({}, op, {habits: op.habits.concat([{id:'habit_'+Date.now(), name: name, active:true, createdDate: todayStr()}])})); }
-  async function toggleHabitArchive(op, habitId) { await updateOperator(Object.assign({}, op, {habits: op.habits.map(h => h.id===habitId ? Object.assign({},h,{active:!h.active}) : h)})); }
+  async function undeploy(op) { await sb.from('profiles').update({current_deployment_id: null}).eq('id', op.id); await refetchAll(); }
+  async function claimReinforcement(op) { await sb.from('profiles').update({reinforcement_drops_available: 1, mcp_at_last_reinforcement: nonCampaignMCP(op.id, logs)}).eq('id', op.id); await refetchAll(); }
+  async function addHabit(op, name) { await sb.from('habits').insert({operator_id: op.id, name: name, active: true, created_date: todayStr()}); await refetchAll(); }
+  async function toggleHabitArchive(op, habitId) {
+    const h = op.habits.find(h=>h.id===habitId);
+    await sb.from('habits').update({active: !h.active}).eq('id', habitId);
+    await refetchAll();
+  }
   async function logHabitCheckin(op, habitId) {
     if (logs.some(l => l.type==='habit' && l.operatorId===op.id && l.habitId===habitId && l.date===todayStr())) return;
-    await addLogs([{ id:'hlog_'+Date.now()+'_'+habitId, operatorId: op.id, type:'habit', habitId: habitId, date: todayStr(), timestamp: Date.now() }]);
+    await addLogs([{ id: crypto.randomUUID(), operatorId: op.id, type:'habit', habitId: habitId, date: todayStr(), timestamp: Date.now() }]);
   }
   async function saveCustomProtocol(op, protocol) {
+    if (!op.customProtocols.some(p=>p.id===protocol.id) && op.customProtocols.length>=5) return false;
     const existingIdx = op.customProtocols.findIndex(p=>p.id===protocol.id);
     let newList;
     if (existingIdx>=0) { newList = op.customProtocols.slice(); newList[existingIdx]=protocol; }
-    else { if (op.customProtocols.length>=5) return false; newList = op.customProtocols.concat([protocol]); }
-    await updateOperator(Object.assign({}, op, {customProtocols:newList}));
+    else newList = op.customProtocols.concat([protocol]);
+    await sb.from('profiles').update({custom_protocols: newList}).eq('id', op.id);
+    await refetchAll();
     return true;
   }
-  async function deleteCustomProtocol(op, protocolId) { await updateOperator(Object.assign({}, op, {customProtocols: op.customProtocols.filter(p=>p.id!==protocolId)})); }
+  async function deleteCustomProtocol(op, protocolId) {
+    await sb.from('profiles').update({custom_protocols: op.customProtocols.filter(p=>p.id!==protocolId)}).eq('id', op.id);
+    await refetchAll();
+  }
+  async function signOut() { await sb.auth.signOut(); }
 
-  if (!loaded) return <div style={{padding:40,fontFamily:'IBM Plex Mono, monospace',color:'#8A93A6'}}>ESTABLISHING UPLINK...</div>;
-  if (!activeOpId) return <Login operators={operators} onLogin={setActiveOpId} onEnroll={enrollOperator} />;
-
-  const op = operators.find(o => o.id === activeOpId);
+  const op = (session && loaded) ? operators.find(o => o.id === session.user.id) : null;
   const opOnboarded = op && op.onboarded;
   const statusTop = opOnboarded ? computeReadinessStatus(op.id, logs) : null;
   const orsDataTop = opOnboarded ? computeORS(op.id, op, logs) : null;
   const currentRankTop = opOnboarded ? computeRank(orsDataTop.ors, op.id, logs, campaigns, statusTop) : null;
   const deployedCampaignTop = (opOnboarded && op.currentDeploymentId) ? campaigns.find(c => c.id === op.currentDeploymentId) : null;
 
+  // Hook runs unconditionally every render and guards its own logic internally —
+  // never place this after an early return, or React's hook order breaks.
   useEffect(() => {
-    if (!loaded || !opOnboarded || !currentRankTop) return;
+    if (!loaded || !opOnboarded || !currentRankTop || !op) return;
     if (RANK_ORDER.indexOf(currentRankTop) > RANK_ORDER.indexOf(op.lastSeenRank || 'Recruit')) {
       setRankUpModal(currentRankTop);
       updateOperator(Object.assign({}, op, {lastSeenRank: currentRankTop}));
     }
   }, [currentRankTop, loaded, opOnboarded]);
 
-  if (!op) { setActiveOpId(null); return null; }
+  if (!session) return <Login onAuthed={()=>{}} />;
+  if (!loaded) return <div style={{padding:40,fontFamily:'IBM Plex Mono, monospace',color:'#8A93A6'}}>ESTABLISHING UPLINK...</div>;
+  if (!op) return <div style={{padding:40,fontFamily:'IBM Plex Mono, monospace',color:'#8A93A6'}}>PROVISIONING PERSONNEL FILE... (refresh in a moment if this persists)</div>;
   if (!op.onboarded) return <Onboarding op={op} onComplete={(updatedOp)=>{ updateOperator(updatedOp); }} />;
 
   const dossierOp = viewDossierId ? operators.find(o=>o.id===viewDossierId) : op;
@@ -1099,7 +1238,7 @@ function App() {
         </div>
         <div className="topbar-right">
           <div className="who"><Avatar op={op} size={28} /> {op.callsign}</div>
-          <button className="ghost small" onClick={()=>setActiveOpId(null)}>Log Out</button>
+          <button className="ghost small" onClick={signOut}>Log Out</button>
           <button className="ghost small" onClick={() => setShowReset(true)}>Reset Test Data</button>
         </div>
       </div>
@@ -1142,7 +1281,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowReset(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="disp" style={{fontSize:16,marginBottom:10}}>Reset all test data?</div>
-            <div className="dim" style={{fontSize:13,marginBottom:18}}>Clears logs, chat, and resets Campaigns. Operators, habits, and custom Protocols are kept. Cannot be undone.</div>
+            <div className="dim" style={{fontSize:13,marginBottom:18}}>Clears logs, chat, and Campaigns from the database. Operator accounts, habits, and custom Protocols are kept. Cannot be undone.</div>
             <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
               <button className="ghost" onClick={() => setShowReset(false)}>Cancel</button>
               <button className="danger" onClick={resetAll}>Wipe & Reset</button>
