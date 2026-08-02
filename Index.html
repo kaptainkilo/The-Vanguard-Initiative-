@@ -198,6 +198,39 @@
 
   .protocol-card{border:1px solid var(--border);border-radius:3px;padding:14px;margin-bottom:10px;}
   .protocol-card.full{opacity:0.5;}
+  .galaxy-wrap{position:relative;min-height:520px;border-radius:4px;overflow:hidden;
+    background:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1px 1px at 35% 85%, rgba(255,255,255,0.25), transparent),
+      radial-gradient(1px 1px at 90% 55%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 10% 60%, rgba(255,255,255,0.2), transparent),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.3), transparent),
+      #05070d;
+    border:1px solid var(--border);
+  }
+  .galaxy-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,178,56,0.35), transparent 70%);border:1px solid var(--amber-dim);
+    display:flex;align-items:center;justify-content:center;z-index:2;}
+  .galaxy-core-dot{width:14px;height:14px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px var(--amber);}
+  .galaxy-core-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:var(--amber-dim);font-family:'IBM Plex Mono',monospace;letter-spacing:0.08em;margin-top:4px;}
+  .planet-node{position:absolute;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:transform .15s;z-index:3;}
+  .planet-node:hover{transform:scale(1.15);}
+  .planet-dot{width:16px;height:16px;border-radius:50%;}
+  .planet-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.04em;margin-top:6px;text-align:center;}
+  .faction-kharvax{background:radial-gradient(circle, rgba(228,87,46,0.4), transparent 70%);border:1px solid #E4572E;}
+  .faction-kharvax .planet-dot{background:#E4572E;box-shadow:0 0 10px #E4572E;}
+  .faction-voss{background:radial-gradient(circle, rgba(124,169,232,0.35), transparent 70%);border:1px solid #7CA9E8;}
+  .faction-voss .planet-dot{background:#7CA9E8;box-shadow:0 0 10px #7CA9E8;}
+  .faction-skarn{background:radial-gradient(circle, rgba(111,207,151,0.35), transparent 70%);border:1px solid #6FCF97;}
+  .faction-skarn .planet-dot{background:#6FCF97;box-shadow:0 0 10px #6FCF97;}
+  .faction-unknown{background:radial-gradient(circle, rgba(138,147,166,0.3), transparent 70%);border:1px dashed #8A93A6;}
+  .faction-unknown .planet-dot{background:#8A93A6;}
+  .galaxy-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;font-size:11px;color:var(--text-dim);}
+  .galaxy-legend-item{display:flex;align-items:center;gap:6px;}
+  .galaxy-legend-dot{width:10px;height:10px;border-radius:50%;}
 </style>
 </head>
 <body>
@@ -252,87 +285,97 @@ const COMMAND_QUIPS = [
 ];
 
 const EXERCISES = [
-  {name:'Push-Up', category:'pushups', unit:'reps', alternatives:['Incline Push-Up','Decline Push-Up','Knee Push-Up','Weighted Push-Up','Diamond Push-Up','Archer Push-Up']},
-  {name:'Barbell Bench Press', category:'chest_press', unit:'reps', alternatives:['Dumbbell Bench Press','Incline Barbell Press','Machine Chest Press']},
-  {name:'Incline Barbell Press', category:'chest_press', unit:'reps', alternatives:['Incline Dumbbell Press','Push-Up']},
-  {name:'Incline Dumbbell Press', category:'chest_press', unit:'reps', alternatives:['Incline Barbell Press','Push-Up']},
-  {name:'Dumbbell Chest Press', category:'chest_press', unit:'reps', alternatives:['Barbell Bench Press','Push-Up']},
-  {name:'Standing Overhead Press', category:'shoulder_press', unit:'reps', alternatives:['Seated Dumbbell Press','Dumbbell Shoulder Press','Pike Push-Up']},
-  {name:'Seated Dumbbell Shoulder Press', category:'shoulder_press', unit:'reps', alternatives:['Standing Overhead Press','Pike Push-Up']},
-  {name:'Arnold Press', category:'shoulder_press', unit:'reps', alternatives:['Standing Overhead Press','Machine Shoulder Press']},
-  {name:'Dumbbell Lateral Raise', category:'shoulder_iso', unit:'reps', alternatives:['Cable Lateral Raise','Band Lateral Raise']},
-  {name:'Cable Lateral Raise', category:'shoulder_iso', unit:'reps', alternatives:['Dumbbell Lateral Raise','Band Lateral Raise']},
-  {name:'Triceps Pushdown', category:'arms', unit:'reps', alternatives:['Overhead Triceps Extension','Chair Dips','Bench Dips']},
-  {name:'Overhead Triceps Extension', category:'arms', unit:'reps', alternatives:['Triceps Pushdown','Bench Dips']},
-  {name:'Dips', category:'chest_press', unit:'reps', alternatives:['Bench Dips','Chair Dips']},
-  {name:'Chest Dips', category:'chest_press', unit:'reps', alternatives:['Bench Dips','Chair Dips']},
-  {name:'Chair Dips', category:'chest_press', unit:'reps', alternatives:['Bench Dips']},
-  {name:'Cable Fly', category:'chest_press', unit:'reps', alternatives:['Pec Deck','Dumbbell Fly']},
-  {name:'Close-Grip Push-Up', category:'pushups', unit:'reps', alternatives:['Diamond Push-Up']},
-  {name:'Pull-Up', category:'pullups', unit:'reps', alternatives:['Assisted Pull-Up','Negative Pull-Up','Band-Assisted Pull-Up','Weighted Pull-Up','Inverted Row']},
-  {name:'Barbell Row', category:'back_row', unit:'reps', alternatives:['Dumbbell Row','Chest Supported Row','Inverted Row']},
-  {name:'Chest Supported Row', category:'back_row', unit:'reps', alternatives:['Dumbbell Row','Machine Row']},
-  {name:'Single-Arm Dumbbell Row', category:'back_row', unit:'reps', alternatives:['Barbell Row','Chest Supported Row']},
-  {name:'Lat Pulldown', category:'pullups', unit:'reps', alternatives:['Band Pulldown','Assisted Pull-Up','Neutral Grip Pulldown']},
-  {name:'Neutral Grip Pulldown', category:'pullups', unit:'reps', alternatives:['Pull-Up','Assisted Pull-Up']},
-  {name:'Deadlift', category:'posterior_chain', unit:'reps', alternatives:['Trap Bar Deadlift','Kettlebell Deadlift','Romanian Deadlift']},
-  {name:'Trap Bar Deadlift', category:'posterior_chain', unit:'reps', alternatives:['Deadlift','Kettlebell Deadlift']},
-  {name:'Hammer Curl', category:'arms', unit:'reps', alternatives:['Barbell Curl','Band Curl']},
-  {name:'Barbell Curl', category:'arms', unit:'reps', alternatives:['Dumbbell Curl','EZ-Bar Curl']},
-  {name:'EZ-Bar Curl', category:'arms', unit:'reps', alternatives:['Barbell Curl','Dumbbell Curl']},
-  {name:'Face Pull', category:'shoulder_iso', unit:'reps', alternatives:['Rear Delt Fly','Reverse Snow Angel']},
-  {name:'Rear Delt Fly', category:'shoulder_iso', unit:'reps', alternatives:['Face Pull','Reverse Snow Angel']},
-  {name:'Inverted Row', category:'back_row', unit:'reps', alternatives:['Resistance Band Row','Backpack Row']},
-  {name:'Bodyweight Squat', category:'squats', unit:'reps', alternatives:['Jump Squat','Weighted Backpack Squat','Goblet Squat']},
-  {name:'Barbell Back Squat', category:'squats', unit:'reps', alternatives:['Front Squat','Goblet Squat','Bodyweight Squat']},
-  {name:'Front Squat', category:'squats', unit:'reps', alternatives:['Barbell Back Squat','Goblet Squat']},
-  {name:'Leg Press', category:'squats', unit:'reps', alternatives:['Bulgarian Split Squat','Dumbbell Squat']},
-  {name:'Romanian Deadlift', category:'posterior_chain', unit:'reps', alternatives:['Dumbbell Romanian Deadlift','Single-Leg Romanian Deadlift']},
-  {name:'Hip Thrust', category:'posterior_chain', unit:'reps', alternatives:['Glute Bridge','Cable Pull Through']},
-  {name:'Walking Lunge', category:'legs_unilateral', unit:'reps', alternatives:['Bulgarian Split Squat','Step-Up']},
-  {name:'Bulgarian Split Squat', category:'legs_unilateral', unit:'reps', alternatives:['Walking Lunge','Assisted Split Squat']},
-  {name:'Single-Leg Glute Bridge', category:'legs_unilateral', unit:'reps', alternatives:['Glute Bridge','Hip Thrust']},
-  {name:'Box Jump', category:'legs_unilateral', unit:'reps', alternatives:['Squat Jump','Weighted Jump Variation']},
-  {name:'Calf Raise', category:'legs_iso', unit:'reps', alternatives:['Single-Leg Calf Raise']},
-  {name:'Standing Calf Raise', category:'legs_iso', unit:'reps', alternatives:['Single-Leg Calf Raise']},
-  {name:'Hamstring Curl', category:'legs_iso', unit:'reps', alternatives:['Leg Curl']},
-  {name:'Leg Curl', category:'legs_iso', unit:'reps', alternatives:['Hamstring Curl']},
-  {name:'Wall Sit', category:'legs_iso', unit:'seconds', alternatives:['Bodyweight Squat Hold']},
-  {name:'Farmer Carry', category:'carry', unit:'reps', alternatives:['Kettlebell Carry','Backpack Carry']},
-  {name:'Kettlebell Swing', category:'conditioning', unit:'reps', alternatives:['Dumbbell Swing','Explosive Hip Hinge']},
-  {name:'Plank', category:'core', unit:'seconds', alternatives:['Knee Plank','Weighted Plank','Side Plank']},
-  {name:'Side Plank', category:'core', unit:'seconds', alternatives:['Plank','Knee Plank']},
-  {name:'Hollow Body Hold', category:'core', unit:'seconds', alternatives:['Plank']},
-  {name:'Hanging Knee Raise', category:'core', unit:'reps', alternatives:['Lying Leg Raise','Reverse Crunch']},
-  {name:'Lying Leg Raise', category:'core', unit:'reps', alternatives:['Hanging Knee Raise','Reverse Crunch']},
-  {name:'Dead Bug', category:'core', unit:'reps', alternatives:['Bird Dog']},
-  {name:'Pallof Press', category:'core', unit:'reps', alternatives:['Dead Bug']},
-  {name:'Ab Wheel Rollout', category:'core', unit:'reps', alternatives:['Plank','Dead Bug']},
-  {name:'Russian Twist', category:'core', unit:'reps', alternatives:['Bicycle Crunch']},
-  {name:'Bicycle Crunch', category:'core', unit:'reps', alternatives:['Russian Twist']},
-  {name:'Mountain Climbers', category:'core', unit:'reps', alternatives:['Russian Twist']},
-  {name:'Running', category:'cardio_minutes', unit:'minutes', alternatives:['Rowing','Jump Rope','Assault Bike Intervals']},
-  {name:'Rowing', category:'cardio_minutes', unit:'minutes', alternatives:['Running','Assault Bike Intervals']},
-  {name:'Assault Bike Intervals', category:'cardio_minutes', unit:'minutes', alternatives:['Running','Rowing']},
-  {name:'Jump Rope', category:'cardio_minutes', unit:'minutes', alternatives:['Jumping Jacks','High Knees']},
-  {name:'Incline Walk', category:'cardio_minutes', unit:'minutes', alternatives:['Running','Rowing']},
-  {name:'Burpees', category:'conditioning', unit:'reps', alternatives:['Step-Back Burpee']},
-  {name:'Pike Push-Up', category:'shoulder_press', unit:'reps', alternatives:['Seated Dumbbell Shoulder Press','Handstand Push-Up']},
-  {name:'Medicine Ball Slam', category:'conditioning', unit:'reps', alternatives:['Kettlebell Swing','Burpees']},
-  {name:'Pistol Squat', category:'legs_unilateral', unit:'reps', alternatives:['Bulgarian Split Squat','Assisted Pistol Squat']},
-  {name:'Turkish Get-Up', category:'core', unit:'reps', alternatives:['Single-Arm Overhead Carry']},
-  {name:'Single-Arm Overhead Press', category:'shoulder_press', unit:'reps', alternatives:['Seated Dumbbell Shoulder Press']},
+  {name:'Push-Up', muscleGroup:'Chest', unit:'reps', alternatives:['Incline Push-Up','Decline Push-Up','Knee Push-Up','Weighted Push-Up','Diamond Push-Up','Archer Push-Up']},
+  {name:'Barbell Bench Press', muscleGroup:'Chest', unit:'reps', alternatives:['Dumbbell Bench Press','Incline Barbell Press','Machine Chest Press']},
+  {name:'Incline Barbell Press', muscleGroup:'Chest', unit:'reps', alternatives:['Incline Dumbbell Press','Push-Up']},
+  {name:'Incline Dumbbell Press', muscleGroup:'Chest', unit:'reps', alternatives:['Incline Barbell Press','Push-Up']},
+  {name:'Dumbbell Chest Press', muscleGroup:'Chest', unit:'reps', alternatives:['Barbell Bench Press','Push-Up']},
+  {name:'Standing Overhead Press', muscleGroup:'Shoulders', unit:'reps', alternatives:['Seated Dumbbell Press','Dumbbell Shoulder Press','Pike Push-Up']},
+  {name:'Seated Dumbbell Shoulder Press', muscleGroup:'Shoulders', unit:'reps', alternatives:['Standing Overhead Press','Pike Push-Up']},
+  {name:'Arnold Press', muscleGroup:'Shoulders', unit:'reps', alternatives:['Standing Overhead Press','Machine Shoulder Press']},
+  {name:'Dumbbell Lateral Raise', muscleGroup:'Shoulders', unit:'reps', alternatives:['Cable Lateral Raise','Band Lateral Raise']},
+  {name:'Cable Lateral Raise', muscleGroup:'Shoulders', unit:'reps', alternatives:['Dumbbell Lateral Raise','Band Lateral Raise']},
+  {name:'Triceps Pushdown', muscleGroup:'Triceps', unit:'reps', alternatives:['Overhead Triceps Extension','Chair Dips','Bench Dips']},
+  {name:'Overhead Triceps Extension', muscleGroup:'Triceps', unit:'reps', alternatives:['Triceps Pushdown','Bench Dips']},
+  {name:'Dips', muscleGroup:'Chest', unit:'reps', alternatives:['Bench Dips','Chair Dips']},
+  {name:'Chest Dips', muscleGroup:'Chest', unit:'reps', alternatives:['Bench Dips','Chair Dips']},
+  {name:'Chair Dips', muscleGroup:'Triceps', unit:'reps', alternatives:['Bench Dips']},
+  {name:'Cable Fly', muscleGroup:'Chest', unit:'reps', alternatives:['Pec Deck','Dumbbell Fly']},
+  {name:'Close-Grip Push-Up', muscleGroup:'Triceps', unit:'reps', alternatives:['Diamond Push-Up']},
+  {name:'Pull-Up', muscleGroup:'Back', unit:'reps', alternatives:['Assisted Pull-Up','Negative Pull-Up','Band-Assisted Pull-Up','Weighted Pull-Up','Inverted Row']},
+  {name:'Barbell Row', muscleGroup:'Back', unit:'reps', alternatives:['Dumbbell Row','Chest Supported Row','Inverted Row']},
+  {name:'Chest Supported Row', muscleGroup:'Back', unit:'reps', alternatives:['Dumbbell Row','Machine Row']},
+  {name:'Single-Arm Dumbbell Row', muscleGroup:'Back', unit:'reps', alternatives:['Barbell Row','Chest Supported Row']},
+  {name:'Lat Pulldown', muscleGroup:'Back', unit:'reps', alternatives:['Band Pulldown','Assisted Pull-Up','Neutral Grip Pulldown']},
+  {name:'Neutral Grip Pulldown', muscleGroup:'Back', unit:'reps', alternatives:['Pull-Up','Assisted Pull-Up']},
+  {name:'Deadlift', muscleGroup:'Hamstrings', unit:'reps', alternatives:['Trap Bar Deadlift','Kettlebell Deadlift','Romanian Deadlift']},
+  {name:'Trap Bar Deadlift', muscleGroup:'Hamstrings', unit:'reps', alternatives:['Deadlift','Kettlebell Deadlift']},
+  {name:'Hammer Curl', muscleGroup:'Biceps', unit:'reps', alternatives:['Barbell Curl','Band Curl']},
+  {name:'Barbell Curl', muscleGroup:'Biceps', unit:'reps', alternatives:['Dumbbell Curl','EZ-Bar Curl']},
+  {name:'EZ-Bar Curl', muscleGroup:'Biceps', unit:'reps', alternatives:['Barbell Curl','Dumbbell Curl']},
+  {name:'Face Pull', muscleGroup:'Shoulders', unit:'reps', alternatives:['Rear Delt Fly','Reverse Snow Angel']},
+  {name:'Rear Delt Fly', muscleGroup:'Shoulders', unit:'reps', alternatives:['Face Pull','Reverse Snow Angel']},
+  {name:'Inverted Row', muscleGroup:'Back', unit:'reps', alternatives:['Resistance Band Row','Backpack Row']},
+  {name:'Bodyweight Squat', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Jump Squat','Weighted Backpack Squat','Goblet Squat']},
+  {name:'Barbell Back Squat', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Front Squat','Goblet Squat','Bodyweight Squat']},
+  {name:'Front Squat', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Barbell Back Squat','Goblet Squat']},
+  {name:'Leg Press', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Bulgarian Split Squat','Dumbbell Squat']},
+  {name:'Romanian Deadlift', muscleGroup:'Hamstrings', unit:'reps', alternatives:['Dumbbell Romanian Deadlift','Single-Leg Romanian Deadlift']},
+  {name:'Hip Thrust', muscleGroup:'Glutes', unit:'reps', alternatives:['Glute Bridge','Cable Pull Through']},
+  {name:'Walking Lunge', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Bulgarian Split Squat','Step-Up']},
+  {name:'Bulgarian Split Squat', muscleGroup:'Glutes', unit:'reps', alternatives:['Walking Lunge','Assisted Split Squat']},
+  {name:'Single-Leg Glute Bridge', muscleGroup:'Glutes', unit:'reps', alternatives:['Glute Bridge','Hip Thrust']},
+  {name:'Box Jump', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Squat Jump','Weighted Jump Variation']},
+  {name:'Calf Raise', muscleGroup:'Calves', unit:'reps', alternatives:['Single-Leg Calf Raise']},
+  {name:'Standing Calf Raise', muscleGroup:'Calves', unit:'reps', alternatives:['Single-Leg Calf Raise']},
+  {name:'Hamstring Curl', muscleGroup:'Hamstrings', unit:'reps', alternatives:['Leg Curl']},
+  {name:'Leg Curl', muscleGroup:'Hamstrings', unit:'reps', alternatives:['Hamstring Curl']},
+  {name:'Wall Sit', muscleGroup:'Quadriceps', unit:'seconds', alternatives:['Bodyweight Squat Hold']},
+  {name:'Farmer Carry', muscleGroup:'Grip', unit:'reps', alternatives:['Kettlebell Carry','Backpack Carry']},
+  {name:'Kettlebell Swing', muscleGroup:'Glutes', unit:'reps', alternatives:['Dumbbell Swing','Explosive Hip Hinge']},
+  {name:'Plank', muscleGroup:'Core', unit:'seconds', alternatives:['Knee Plank','Weighted Plank','Side Plank']},
+  {name:'Side Plank', muscleGroup:'Core', unit:'seconds', alternatives:['Plank','Knee Plank']},
+  {name:'Hollow Body Hold', muscleGroup:'Core', unit:'seconds', alternatives:['Plank']},
+  {name:'Hanging Knee Raise', muscleGroup:'Core', unit:'reps', alternatives:['Lying Leg Raise','Reverse Crunch']},
+  {name:'Lying Leg Raise', muscleGroup:'Core', unit:'reps', alternatives:['Hanging Knee Raise','Reverse Crunch']},
+  {name:'Dead Bug', muscleGroup:'Core', unit:'reps', alternatives:['Bird Dog']},
+  {name:'Pallof Press', muscleGroup:'Core', unit:'reps', alternatives:['Dead Bug']},
+  {name:'Ab Wheel Rollout', muscleGroup:'Core', unit:'reps', alternatives:['Plank','Dead Bug']},
+  {name:'Russian Twist', muscleGroup:'Core', unit:'reps', alternatives:['Bicycle Crunch']},
+  {name:'Bicycle Crunch', muscleGroup:'Core', unit:'reps', alternatives:['Russian Twist']},
+  {name:'Mountain Climbers', muscleGroup:'Core', unit:'reps', alternatives:['Russian Twist']},
+  {name:'Running', muscleGroup:'Cardio', unit:'minutes', alternatives:['Rowing','Jump Rope','Assault Bike Intervals']},
+  {name:'Rowing', muscleGroup:'Cardio', unit:'minutes', alternatives:['Running','Assault Bike Intervals']},
+  {name:'Assault Bike Intervals', muscleGroup:'Cardio', unit:'minutes', alternatives:['Running','Rowing']},
+  {name:'Jump Rope', muscleGroup:'Cardio', unit:'minutes', alternatives:['Jumping Jacks','High Knees']},
+  {name:'Incline Walk', muscleGroup:'Cardio', unit:'minutes', alternatives:['Running','Rowing']},
+  {name:'Burpees', muscleGroup:'Cardio', unit:'reps', alternatives:['Step-Back Burpee']},
+  {name:'Pike Push-Up', muscleGroup:'Shoulders', unit:'reps', alternatives:['Seated Dumbbell Shoulder Press','Handstand Push-Up']},
+  {name:'Medicine Ball Slam', muscleGroup:'Cardio', unit:'reps', alternatives:['Kettlebell Swing','Burpees']},
+  {name:'Pistol Squat', muscleGroup:'Quadriceps', unit:'reps', alternatives:['Bulgarian Split Squat','Assisted Pistol Squat']},
+  {name:'Turkish Get-Up', muscleGroup:'Core', unit:'reps', alternatives:['Single-Arm Overhead Carry']},
+  {name:'Single-Arm Overhead Press', muscleGroup:'Shoulders', unit:'reps', alternatives:['Seated Dumbbell Shoulder Press']},
 ];
 
-const CATEGORY_TO_KEYWORD = { pushups: 'push-up', squats: 'squat', cardio_minutes: 'cardio minute', pullups: 'pull-up' };
-const CAMPAIGN_BASE_RATES = { pushups: 125, squats: 100, pullups: 40, cardio_minutes: 50, generic: 100, support: 1 };
+const CAMPAIGN_BASE_RATES = {
+  Chest: 125, Back: 90, Shoulders: 100, Biceps: 90, Triceps: 100,
+  Quadriceps: 100, Hamstrings: 80, Glutes: 80, Calves: 120, Core: 100,
+  Grip: 25, Cardio: 50, Support: 1,
+};
 const LOCATION_CATEGORIES = [
-  {id:'pushups', label:'Push-Ups', unit:'push-ups'},
-  {id:'squats', label:'Squats', unit:'squats'},
-  {id:'pullups', label:'Pull-Ups', unit:'pull-ups'},
-  {id:'cardio_minutes', label:'Cardio Minutes', unit:'minutes'},
-  {id:'generic', label:'Generic Reps', unit:'reps'},
-  {id:'support', label:'Support Actions (async, engagement-type)', unit:'actions'},
+  {id:'Chest', label:'Chest', unit:'reps'},
+  {id:'Back', label:'Back', unit:'reps'},
+  {id:'Shoulders', label:'Shoulders', unit:'reps'},
+  {id:'Biceps', label:'Biceps', unit:'reps'},
+  {id:'Triceps', label:'Triceps', unit:'reps'},
+  {id:'Quadriceps', label:'Quadriceps', unit:'reps'},
+  {id:'Hamstrings', label:'Hamstrings', unit:'reps'},
+  {id:'Glutes', label:'Glutes', unit:'reps'},
+  {id:'Calves', label:'Calves', unit:'reps'},
+  {id:'Core', label:'Core', unit:'reps'},
+  {id:'Grip', label:'Grip', unit:'reps'},
+  {id:'Cardio', label:'Cardio', unit:'minutes'},
+  {id:'Support', label:'Support Actions (async, engagement-type)', unit:'actions'},
 ];
 
 // Full Protocol session library — all 16 sessions across Alpha/Bravo/Charlie,
@@ -343,79 +386,79 @@ const PROTOCOL_SESSIONS = [
     trainingNote:'The objective is not to destroy yourself during training. The objective is to create a stronger version of yourself every week.',
     conditioningOptions:['10 Minutes Assault Bike','100 Total Push-Ups','10 Minute Walk Recovery'],
     objectives:[
-      {name:'Barbell Bench Press', category:'chest_press', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Dumbbell Bench Press','Push-Up']},
-      {name:'Standing Overhead Press', category:'shoulder_press', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Seated Dumbbell Shoulder Press']},
-      {name:'Incline Dumbbell Press', category:'chest_press', unit:'reps', sets:3, repLow:8, repHigh:12, alternatives:['Incline Barbell Press']},
-      {name:'Dumbbell Lateral Raise', category:'shoulder_iso', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Cable Lateral Raise']},
-      {name:'Triceps Pushdown', category:'arms', unit:'reps', sets:3, repLow:10, repHigh:15, alternatives:['Overhead Triceps Extension']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:45, repHigh:60, alternatives:['Side Plank']},
+      {name:'Barbell Bench Press', muscleGroup:'Chest', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Dumbbell Bench Press','Push-Up']},
+      {name:'Standing Overhead Press', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Seated Dumbbell Shoulder Press']},
+      {name:'Incline Dumbbell Press', muscleGroup:'Chest', unit:'reps', sets:3, repLow:8, repHigh:12, alternatives:['Incline Barbell Press']},
+      {name:'Dumbbell Lateral Raise', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Cable Lateral Raise']},
+      {name:'Triceps Pushdown', muscleGroup:'Triceps', unit:'reps', sets:3, repLow:10, repHigh:15, alternatives:['Overhead Triceps Extension']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:45, repHigh:60, alternatives:['Side Plank']},
     ]},
   { id:'alpha_2', protocol:'Protocol Alpha', name:'Session 2 — Pull Mission',
     briefing:'Develop pulling strength, upper-back development, grip endurance, and posterior chain capacity.',
     trainingNote:'The back is the armor behind the armor. Train your pulling movements with purpose.',
     conditioningOptions:['10 Minutes Row Machine, Moderate Pace','15 Minute Incline Walk','5 Rounds: 30 Meter Carry / 30 Sec Rest'],
     objectives:[
-      {name:'Pull-Up', category:'pullups', unit:'reps', sets:4, repLow:6, repHigh:10, alternatives:['Assisted Pull-Up','Lat Pulldown']},
-      {name:'Barbell Row', category:'back_row', unit:'reps', sets:4, repLow:8, repHigh:8, alternatives:['Dumbbell Row','Chest Supported Row']},
-      {name:'Lat Pulldown', category:'pullups', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Band Pulldown']},
-      {name:'Rear Delt Fly', category:'shoulder_iso', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Face Pull']},
-      {name:'Hammer Curl', category:'arms', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
-      {name:'Farmer Carry', category:'carry', unit:'reps', sets:4, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
+      {name:'Pull-Up', muscleGroup:'Back', unit:'reps', sets:4, repLow:6, repHigh:10, alternatives:['Assisted Pull-Up','Lat Pulldown']},
+      {name:'Barbell Row', muscleGroup:'Back', unit:'reps', sets:4, repLow:8, repHigh:8, alternatives:['Dumbbell Row','Chest Supported Row']},
+      {name:'Lat Pulldown', muscleGroup:'Back', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Band Pulldown']},
+      {name:'Rear Delt Fly', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Face Pull']},
+      {name:'Hammer Curl', muscleGroup:'Biceps', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
+      {name:'Farmer Carry', muscleGroup:'Grip', unit:'reps', sets:4, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
     ]},
   { id:'alpha_3', protocol:'Protocol Alpha', name:'Session 3 — Leg Mission',
     briefing:'Develop lower-body strength, explosive capability, stability, and work capacity.',
     trainingNote:'The strongest structures begin with the strongest foundations. The legs carry the mission.',
     conditioningOptions:['20 Minute Incline Walk, Moderate Pace','10 Rounds: 20s Hard / 100s Recovery (Bike)','5 Rounds: 20 Air Squats / 15 Walking Lunges / 10 Burpees'],
     objectives:[
-      {name:'Barbell Back Squat', category:'squats', unit:'reps', sets:4, repLow:8, repHigh:8, alternatives:['Front Squat','Bodyweight Squat']},
-      {name:'Romanian Deadlift', category:'posterior_chain', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Dumbbell Romanian Deadlift']},
-      {name:'Leg Press', category:'squats', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Bulgarian Split Squat']},
-      {name:'Walking Lunge', category:'legs_unilateral', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Bulgarian Split Squat']},
-      {name:'Leg Curl', category:'legs_iso', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Hamstring Curl']},
-      {name:'Standing Calf Raise', category:'legs_iso', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Calf Raise']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
+      {name:'Barbell Back Squat', muscleGroup:'Quadriceps', unit:'reps', sets:4, repLow:8, repHigh:8, alternatives:['Front Squat','Bodyweight Squat']},
+      {name:'Romanian Deadlift', muscleGroup:'Hamstrings', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Dumbbell Romanian Deadlift']},
+      {name:'Leg Press', muscleGroup:'Quadriceps', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Bulgarian Split Squat']},
+      {name:'Walking Lunge', muscleGroup:'Quadriceps', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Bulgarian Split Squat']},
+      {name:'Leg Curl', muscleGroup:'Hamstrings', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Hamstring Curl']},
+      {name:'Standing Calf Raise', muscleGroup:'Calves', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Calf Raise']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
     ]},
   { id:'alpha_4', protocol:'Protocol Alpha', name:'Session 4 — Push Mission II',
     briefing:'Increase upper-body pressing strength while developing shoulder stability, chest development, and triceps capacity.',
     trainingNote:'Strength is not built only through heavier weight. Strength is built through mastery.',
     conditioningOptions:['12 Minutes Assault Bike, Moderate Pace','Push-Up Ladder 5-10-15-10-5','20 Minute Walking Recovery'],
     objectives:[
-      {name:'Incline Barbell Press', category:'chest_press', unit:'reps', sets:4, repLow:6, repHigh:10, alternatives:['Incline Dumbbell Press']},
-      {name:'Seated Dumbbell Shoulder Press', category:'shoulder_press', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Standing Overhead Press']},
-      {name:'Dumbbell Chest Press', category:'chest_press', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Bench Press']},
-      {name:'Cable Lateral Raise', category:'shoulder_iso', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Dumbbell Lateral Raise']},
-      {name:'Cable Fly', category:'chest_press', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Dumbbell Fly']},
-      {name:'Overhead Triceps Extension', category:'arms', unit:'reps', sets:3, repLow:10, repHigh:15, alternatives:['Triceps Pushdown']},
-      {name:'Dead Bug', category:'core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Bird Dog']},
-      {name:'Side Plank', category:'core', unit:'seconds', sets:3, repLow:45, repHigh:45, alternatives:['Plank']},
+      {name:'Incline Barbell Press', muscleGroup:'Chest', unit:'reps', sets:4, repLow:6, repHigh:10, alternatives:['Incline Dumbbell Press']},
+      {name:'Seated Dumbbell Shoulder Press', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Standing Overhead Press']},
+      {name:'Dumbbell Chest Press', muscleGroup:'Chest', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Bench Press']},
+      {name:'Cable Lateral Raise', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Dumbbell Lateral Raise']},
+      {name:'Cable Fly', muscleGroup:'Chest', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Dumbbell Fly']},
+      {name:'Overhead Triceps Extension', muscleGroup:'Triceps', unit:'reps', sets:3, repLow:10, repHigh:15, alternatives:['Triceps Pushdown']},
+      {name:'Dead Bug', muscleGroup:'Core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Bird Dog']},
+      {name:'Side Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:45, repHigh:45, alternatives:['Plank']},
     ]},
   { id:'alpha_5', protocol:'Protocol Alpha', name:'Session 5 — Pull Mission II',
     briefing:'Increase pulling power, develop back thickness, improve grip strength, and strengthen total-body control.',
     trainingNote:'A powerful back creates better posture, stronger presses, greater stability, and increased physical confidence.',
     conditioningOptions:['8 Rounds: 250m Row Hard / 60s Recovery','20 Minute Incline Walk','10 Minute Loaded Carry Circuit'],
     objectives:[
-      {name:'Deadlift', category:'posterior_chain', unit:'reps', sets:4, repLow:5, repHigh:5, alternatives:['Trap Bar Deadlift']},
-      {name:'Chest Supported Row', category:'back_row', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Dumbbell Row']},
-      {name:'Neutral Grip Pulldown', category:'pullups', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Pull-Up']},
-      {name:'Single-Arm Dumbbell Row', category:'back_row', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Barbell Row']},
-      {name:'Face Pull', category:'shoulder_iso', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Rear Delt Fly']},
-      {name:'EZ-Bar Curl', category:'arms', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
-      {name:'Hanging Knee Raise', category:'core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Lying Leg Raise']},
-      {name:'Pallof Press', category:'core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Dead Bug']},
+      {name:'Deadlift', muscleGroup:'Hamstrings', unit:'reps', sets:4, repLow:5, repHigh:5, alternatives:['Trap Bar Deadlift']},
+      {name:'Chest Supported Row', muscleGroup:'Back', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Dumbbell Row']},
+      {name:'Neutral Grip Pulldown', muscleGroup:'Back', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Pull-Up']},
+      {name:'Single-Arm Dumbbell Row', muscleGroup:'Back', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Barbell Row']},
+      {name:'Face Pull', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Rear Delt Fly']},
+      {name:'EZ-Bar Curl', muscleGroup:'Biceps', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
+      {name:'Hanging Knee Raise', muscleGroup:'Core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Lying Leg Raise']},
+      {name:'Pallof Press', muscleGroup:'Core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Dead Bug']},
     ]},
   { id:'alpha_6', protocol:'Protocol Alpha', name:'Session 6 — Leg Mission II',
     briefing:'Develop explosive lower-body power, unilateral strength, mobility, and endurance.',
     trainingNote:'Strength without movement is incomplete. Power without control is dangerous. Build strength, speed, and endurance together.',
     conditioningOptions:['8 Rounds: 20s Sprint / 100s Recovery','15 Minute Stair Climb','5 Rounds: 20 Air Squats / 15 Walking Lunges / 10 Burpees'],
     objectives:[
-      {name:'Front Squat', category:'squats', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Barbell Back Squat']},
-      {name:'Box Jump', category:'legs_unilateral', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Squat Jump']},
-      {name:'Hip Thrust', category:'posterior_chain', unit:'reps', sets:4, repLow:8, repHigh:12, alternatives:['Glute Bridge']},
-      {name:'Bulgarian Split Squat', category:'legs_unilateral', unit:'reps', sets:3, repLow:8, repHigh:10, alternatives:['Walking Lunge']},
-      {name:'Hamstring Curl', category:'legs_iso', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Leg Curl']},
-      {name:'Standing Calf Raise', category:'legs_iso', unit:'reps', sets:4, repLow:15, repHigh:20, alternatives:['Calf Raise']},
-      {name:'Kettlebell Swing', category:'conditioning', unit:'reps', sets:5, repLow:20, repHigh:20, alternatives:['Dumbbell Swing']},
-      {name:'Ab Wheel Rollout', category:'core', unit:'reps', sets:3, repLow:8, repHigh:12, alternatives:['Plank']},
+      {name:'Front Squat', muscleGroup:'Quadriceps', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Barbell Back Squat']},
+      {name:'Box Jump', muscleGroup:'Quadriceps', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Squat Jump']},
+      {name:'Hip Thrust', muscleGroup:'Glutes', unit:'reps', sets:4, repLow:8, repHigh:12, alternatives:['Glute Bridge']},
+      {name:'Bulgarian Split Squat', muscleGroup:'Glutes', unit:'reps', sets:3, repLow:8, repHigh:10, alternatives:['Walking Lunge']},
+      {name:'Hamstring Curl', muscleGroup:'Hamstrings', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Leg Curl']},
+      {name:'Standing Calf Raise', muscleGroup:'Calves', unit:'reps', sets:4, repLow:15, repHigh:20, alternatives:['Calf Raise']},
+      {name:'Kettlebell Swing', muscleGroup:'Glutes', unit:'reps', sets:5, repLow:20, repHigh:20, alternatives:['Dumbbell Swing']},
+      {name:'Ab Wheel Rollout', muscleGroup:'Core', unit:'reps', sets:3, repLow:8, repHigh:12, alternatives:['Plank']},
     ]},
 
   { id:'bravo_1', protocol:'Protocol Bravo', name:'Session 1 — Chest & Triceps',
@@ -423,65 +466,65 @@ const PROTOCOL_SESSIONS = [
     trainingNote:'The Vanguard does not chase appearance alone. A capable body is built through balanced development.',
     conditioningOptions:['10 Minute Bike','Push-Up Finisher — 100 Total Repetitions'],
     objectives:[
-      {name:'Barbell Bench Press', category:'chest_press', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Dumbbell Bench Press']},
-      {name:'Incline Dumbbell Press', category:'chest_press', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Incline Barbell Press']},
-      {name:'Chest Dips', category:'chest_press', unit:'reps', sets:3, repLow:8, repHigh:12, alternatives:['Chair Dips']},
-      {name:'Cable Fly', category:'chest_press', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Dumbbell Fly']},
-      {name:'Triceps Pushdown', category:'arms', unit:'reps', sets:4, repLow:10, repHigh:15, alternatives:['Overhead Triceps Extension']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
+      {name:'Barbell Bench Press', muscleGroup:'Chest', unit:'reps', sets:4, repLow:6, repHigh:8, alternatives:['Dumbbell Bench Press']},
+      {name:'Incline Dumbbell Press', muscleGroup:'Chest', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Incline Barbell Press']},
+      {name:'Chest Dips', muscleGroup:'Chest', unit:'reps', sets:3, repLow:8, repHigh:12, alternatives:['Chair Dips']},
+      {name:'Cable Fly', muscleGroup:'Chest', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Dumbbell Fly']},
+      {name:'Triceps Pushdown', muscleGroup:'Triceps', unit:'reps', sets:4, repLow:10, repHigh:15, alternatives:['Overhead Triceps Extension']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
     ]},
   { id:'bravo_2', protocol:'Protocol Bravo', name:'Session 2 — Back & Biceps',
     briefing:'Develop back strength, grip capacity, posture, and pulling power.',
     trainingNote:'The Vanguard builds strength from the inside out. A strong back creates better posture and stronger pressing.',
     conditioningOptions:['15 Minute Row Machine, Moderate Pace','5 Rounds Farmer Carry, 40 Meters','20 Minute Incline Walk'],
     objectives:[
-      {name:'Deadlift', category:'posterior_chain', unit:'reps', sets:4, repLow:5, repHigh:5, alternatives:['Trap Bar Deadlift']},
-      {name:'Pull-Up', category:'pullups', unit:'reps', sets:4, repLow:6, repHigh:10, alternatives:['Assisted Pull-Up']},
-      {name:'Chest Supported Row', category:'back_row', unit:'reps', sets:4, repLow:8, repHigh:12, alternatives:['Dumbbell Row']},
-      {name:'Lat Pulldown', category:'pullups', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Band Pulldown']},
-      {name:'Face Pull', category:'shoulder_iso', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Rear Delt Fly']},
-      {name:'Hammer Curl', category:'arms', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
+      {name:'Deadlift', muscleGroup:'Hamstrings', unit:'reps', sets:4, repLow:5, repHigh:5, alternatives:['Trap Bar Deadlift']},
+      {name:'Pull-Up', muscleGroup:'Back', unit:'reps', sets:4, repLow:6, repHigh:10, alternatives:['Assisted Pull-Up']},
+      {name:'Chest Supported Row', muscleGroup:'Back', unit:'reps', sets:4, repLow:8, repHigh:12, alternatives:['Dumbbell Row']},
+      {name:'Lat Pulldown', muscleGroup:'Back', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Band Pulldown']},
+      {name:'Face Pull', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Rear Delt Fly']},
+      {name:'Hammer Curl', muscleGroup:'Biceps', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
     ]},
   { id:'bravo_3', protocol:'Protocol Bravo', name:'Session 3 — Lower Body Operations',
     briefing:'Develop lower-body strength, explosive power, mobility, and physical durability.',
     trainingNote:'The foundation determines the structure. A weak foundation limits every mission. Train the legs, build the engine.',
     conditioningOptions:['25 Minute Incline Walk','10 Rounds Sled Push, 20-30 Meters','5 Rounds: 20 Air Squats / 15 Walking Lunges / 10 Burpees'],
     objectives:[
-      {name:'Barbell Back Squat', category:'squats', unit:'reps', sets:4, repLow:5, repHigh:8, alternatives:['Front Squat']},
-      {name:'Romanian Deadlift', category:'posterior_chain', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Dumbbell Romanian Deadlift']},
-      {name:'Leg Press', category:'squats', unit:'reps', sets:4, repLow:10, repHigh:12, alternatives:['Bulgarian Split Squat']},
-      {name:'Bulgarian Split Squat', category:'legs_unilateral', unit:'reps', sets:3, repLow:8, repHigh:10, alternatives:['Walking Lunge']},
-      {name:'Leg Curl', category:'legs_iso', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Hamstring Curl']},
-      {name:'Standing Calf Raise', category:'legs_iso', unit:'reps', sets:4, repLow:12, repHigh:20, alternatives:['Calf Raise']},
-      {name:'Kettlebell Swing', category:'conditioning', unit:'reps', sets:5, repLow:20, repHigh:20, alternatives:['Dumbbell Swing']},
+      {name:'Barbell Back Squat', muscleGroup:'Quadriceps', unit:'reps', sets:4, repLow:5, repHigh:8, alternatives:['Front Squat']},
+      {name:'Romanian Deadlift', muscleGroup:'Hamstrings', unit:'reps', sets:4, repLow:8, repHigh:10, alternatives:['Dumbbell Romanian Deadlift']},
+      {name:'Leg Press', muscleGroup:'Quadriceps', unit:'reps', sets:4, repLow:10, repHigh:12, alternatives:['Bulgarian Split Squat']},
+      {name:'Bulgarian Split Squat', muscleGroup:'Glutes', unit:'reps', sets:3, repLow:8, repHigh:10, alternatives:['Walking Lunge']},
+      {name:'Leg Curl', muscleGroup:'Hamstrings', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Hamstring Curl']},
+      {name:'Standing Calf Raise', muscleGroup:'Calves', unit:'reps', sets:4, repLow:12, repHigh:20, alternatives:['Calf Raise']},
+      {name:'Kettlebell Swing', muscleGroup:'Glutes', unit:'reps', sets:5, repLow:20, repHigh:20, alternatives:['Dumbbell Swing']},
     ]},
   { id:'bravo_4', protocol:'Protocol Bravo', name:'Session 4 — Shoulder & Core Operations',
     briefing:'Develop shoulder strength, joint stability, core integrity, and total-body control.',
     trainingNote:'Armor is built through preparation. Strong shoulders protect performance. A strong core transfers power.',
     conditioningOptions:['10 Rounds Battle Rope, 30s Work / 30s Rest','15 Minute Assault Bike, Moderate','5 Rounds: 20 Mountain Climbers / 15 Sit-Ups / 30s Plank'],
     objectives:[
-      {name:'Standing Overhead Press', category:'shoulder_press', unit:'reps', sets:5, repLow:5, repHigh:8, alternatives:['Seated Dumbbell Shoulder Press']},
-      {name:'Dumbbell Lateral Raise', category:'shoulder_iso', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Cable Lateral Raise']},
-      {name:'Rear Delt Fly', category:'shoulder_iso', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Face Pull']},
-      {name:'Arnold Press', category:'shoulder_press', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Standing Overhead Press']},
-      {name:'Face Pull', category:'shoulder_iso', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Rear Delt Fly']},
-      {name:'Farmer Carry', category:'carry', unit:'reps', sets:5, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
-      {name:'Hanging Knee Raise', category:'core', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Lying Leg Raise']},
-      {name:'Pallof Press', category:'core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Dead Bug']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
+      {name:'Standing Overhead Press', muscleGroup:'Shoulders', unit:'reps', sets:5, repLow:5, repHigh:8, alternatives:['Seated Dumbbell Shoulder Press']},
+      {name:'Dumbbell Lateral Raise', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Cable Lateral Raise']},
+      {name:'Rear Delt Fly', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:12, repHigh:15, alternatives:['Face Pull']},
+      {name:'Arnold Press', muscleGroup:'Shoulders', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Standing Overhead Press']},
+      {name:'Face Pull', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Rear Delt Fly']},
+      {name:'Farmer Carry', muscleGroup:'Grip', unit:'reps', sets:5, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
+      {name:'Hanging Knee Raise', muscleGroup:'Core', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Lying Leg Raise']},
+      {name:'Pallof Press', muscleGroup:'Core', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Dead Bug']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
     ]},
   { id:'bravo_5', protocol:'Protocol Bravo', name:'Session 5 — Full Body Operator Day',
     briefing:'Develop complete physical capability by combining strength, conditioning, and movement proficiency.',
     trainingNote:'The Vanguard is not built in one movement. The Vanguard is built through integration.',
     conditioningOptions:['Vanguard Operator Test: 500m Row / 50 Push-Ups / 50 Air Squats / 25 Pull-Ups / 1000m Run'],
     objectives:[
-      {name:'Trap Bar Deadlift', category:'posterior_chain', unit:'reps', sets:5, repLow:5, repHigh:5, alternatives:['Deadlift']},
-      {name:'Barbell Bench Press', category:'chest_press', unit:'reps', sets:4, repLow:6, repHigh:6, alternatives:['Dumbbell Bench Press']},
-      {name:'Pull-Up', category:'pullups', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Assisted Pull-Up']},
-      {name:'Front Squat', category:'squats', unit:'reps', sets:4, repLow:6, repHigh:6, alternatives:['Barbell Back Squat']},
-      {name:'Farmer Carry', category:'carry', unit:'reps', sets:5, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
-      {name:'Kettlebell Swing', category:'conditioning', unit:'reps', sets:5, repLow:20, repHigh:20, alternatives:['Dumbbell Swing']},
-      {name:'Burpees', category:'conditioning', unit:'reps', sets:3, repLow:15, repHigh:15, alternatives:['Step-Back Burpee']},
+      {name:'Trap Bar Deadlift', muscleGroup:'Hamstrings', unit:'reps', sets:5, repLow:5, repHigh:5, alternatives:['Deadlift']},
+      {name:'Barbell Bench Press', muscleGroup:'Chest', unit:'reps', sets:4, repLow:6, repHigh:6, alternatives:['Dumbbell Bench Press']},
+      {name:'Pull-Up', muscleGroup:'Back', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Assisted Pull-Up']},
+      {name:'Front Squat', muscleGroup:'Quadriceps', unit:'reps', sets:4, repLow:6, repHigh:6, alternatives:['Barbell Back Squat']},
+      {name:'Farmer Carry', muscleGroup:'Grip', unit:'reps', sets:5, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
+      {name:'Kettlebell Swing', muscleGroup:'Glutes', unit:'reps', sets:5, repLow:20, repHigh:20, alternatives:['Dumbbell Swing']},
+      {name:'Burpees', muscleGroup:'Cardio', unit:'reps', sets:3, repLow:15, repHigh:15, alternatives:['Step-Back Burpee']},
     ]},
 
   { id:'charlie_1', protocol:'Protocol Charlie', name:'Session 1 — Push Operations',
@@ -489,57 +532,57 @@ const PROTOCOL_SESSIONS = [
     trainingNote:'Strength is determined by the discipline to continue when the environment is less than ideal.',
     conditioningOptions:['EMOM 10: 8 Push-Ups + 10 Air Squats','AMRAP 12: 10 Push-Ups / 15 Mountain Climbers / 10 Chair Dips / 20 Jumping Jacks','3 Rounds: 20 Push-Ups / 20 Shoulder Taps / 15 Pike Push-Ups / 60s Rest'],
     objectives:[
-      {name:'Push-Up', category:'pushups', unit:'reps', sets:5, repLow:8, repHigh:15, alternatives:['Incline Push-Up','Decline Push-Up','Weighted Push-Up']},
-      {name:'Pike Push-Up', category:'shoulder_press', unit:'reps', sets:4, repLow:8, repHigh:12, alternatives:['Seated Dumbbell Shoulder Press']},
-      {name:'Chair Dips', category:'chest_press', unit:'reps', sets:3, repLow:10, repHigh:15, alternatives:['Bench Dips']},
-      {name:'Dumbbell Lateral Raise', category:'shoulder_iso', unit:'reps', sets:3, repLow:15, repHigh:15, alternatives:['Band Lateral Raise']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
+      {name:'Push-Up', muscleGroup:'Chest', unit:'reps', sets:5, repLow:8, repHigh:15, alternatives:['Incline Push-Up','Decline Push-Up','Weighted Push-Up']},
+      {name:'Pike Push-Up', muscleGroup:'Shoulders', unit:'reps', sets:4, repLow:8, repHigh:12, alternatives:['Seated Dumbbell Shoulder Press']},
+      {name:'Chair Dips', muscleGroup:'Triceps', unit:'reps', sets:3, repLow:10, repHigh:15, alternatives:['Bench Dips']},
+      {name:'Dumbbell Lateral Raise', muscleGroup:'Shoulders', unit:'reps', sets:3, repLow:15, repHigh:15, alternatives:['Band Lateral Raise']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
     ]},
   { id:'charlie_2', protocol:'Protocol Charlie', name:'Session 2 — Pull Operations',
     briefing:'Develop pulling strength, grip endurance, and postural control using minimal equipment.',
     trainingNote:'A strong back doesn\u2019t require a rack. It requires an angle, a surface, and the discipline to find one.',
     conditioningOptions:['EMOM 10: 8 Inverted Rows + 10 Good Mornings','AMRAP 12: 10 Backpack Rows / 15 Superman Holds / 10 Band Curls / 20 Jumping Jacks','3 Rounds: 20 Inverted Rows / 20 Reverse Snow Angels / 15 Good Mornings / 60s Rest'],
     objectives:[
-      {name:'Inverted Row', category:'back_row', unit:'reps', sets:5, repLow:8, repHigh:15, alternatives:['Resistance Band Row']},
-      {name:'Pull-Up', category:'pullups', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Assisted Pull-Up','Inverted Row']},
-      {name:'Hammer Curl', category:'arms', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
+      {name:'Inverted Row', muscleGroup:'Back', unit:'reps', sets:5, repLow:8, repHigh:15, alternatives:['Resistance Band Row']},
+      {name:'Pull-Up', muscleGroup:'Back', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Assisted Pull-Up','Inverted Row']},
+      {name:'Hammer Curl', muscleGroup:'Biceps', unit:'reps', sets:3, repLow:10, repHigh:12, alternatives:['Barbell Curl']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Side Plank']},
     ]},
   { id:'charlie_3', protocol:'Protocol Charlie', name:'Session 3 — Leg Operations',
     briefing:'Develop lower-body strength, stability, and endurance using bodyweight and minimal equipment.',
     trainingNote:'The legs don\u2019t need a squat rack to get stronger. They need volume, control, and progressive difficulty.',
     conditioningOptions:['EMOM 10: 10 Squats + 8 Walking Lunges','AMRAP 12: 15 Air Squats / 10 Split Squats / 20 Calf Raises / 20 Jumping Jacks','3 Rounds: 20 Air Squats / 15 Walking Lunges / 10 Burpees'],
     objectives:[
-      {name:'Bodyweight Squat', category:'squats', unit:'reps', sets:5, repLow:15, repHigh:25, alternatives:['Jump Squat','Weighted Backpack Squat']},
-      {name:'Bulgarian Split Squat', category:'legs_unilateral', unit:'reps', sets:4, repLow:10, repHigh:10, alternatives:['Walking Lunge']},
-      {name:'Single-Leg Glute Bridge', category:'legs_unilateral', unit:'reps', sets:4, repLow:12, repHigh:12, alternatives:['Hip Thrust']},
-      {name:'Walking Lunge', category:'legs_unilateral', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Bulgarian Split Squat']},
-      {name:'Calf Raise', category:'legs_iso', unit:'reps', sets:4, repLow:20, repHigh:20, alternatives:['Standing Calf Raise']},
-      {name:'Wall Sit', category:'legs_iso', unit:'seconds', sets:2, repLow:30, repHigh:60, alternatives:['Bodyweight Squat Hold']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Hollow Body Hold']},
+      {name:'Bodyweight Squat', muscleGroup:'Quadriceps', unit:'reps', sets:5, repLow:15, repHigh:25, alternatives:['Jump Squat','Weighted Backpack Squat']},
+      {name:'Bulgarian Split Squat', muscleGroup:'Glutes', unit:'reps', sets:4, repLow:10, repHigh:10, alternatives:['Walking Lunge']},
+      {name:'Single-Leg Glute Bridge', muscleGroup:'Glutes', unit:'reps', sets:4, repLow:12, repHigh:12, alternatives:['Hip Thrust']},
+      {name:'Walking Lunge', muscleGroup:'Quadriceps', unit:'reps', sets:3, repLow:12, repHigh:12, alternatives:['Bulgarian Split Squat']},
+      {name:'Calf Raise', muscleGroup:'Calves', unit:'reps', sets:4, repLow:20, repHigh:20, alternatives:['Standing Calf Raise']},
+      {name:'Wall Sit', muscleGroup:'Quadriceps', unit:'seconds', sets:2, repLow:30, repHigh:60, alternatives:['Bodyweight Squat Hold']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:60, repHigh:60, alternatives:['Hollow Body Hold']},
     ]},
   { id:'charlie_4', protocol:'Protocol Charlie', name:'Session 4 — Core & Conditioning',
     briefing:'Develop core stability and cardiovascular work capacity without equipment.',
     trainingNote:'Core strength isn\u2019t about how it looks. It\u2019s about whether the rest of the body can trust it under pressure.',
     conditioningOptions:['EMOM 12: 10 Mountain Climbers + 30s Plank','AMRAP 15: 15 Air Squats / 10 Push-Ups / 15 Mountain Climbers / 20s Plank','4 Rounds: 20 Jumping Jacks / 15 Mountain Climbers / 30s Plank / 45s Rest'],
     objectives:[
-      {name:'Plank', category:'core', unit:'seconds', sets:4, repLow:30, repHigh:60, alternatives:['Knee Plank','Weighted Plank']},
-      {name:'Hanging Knee Raise', category:'core', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Lying Leg Raise']},
-      {name:'Mountain Climbers', category:'core', unit:'reps', sets:4, repLow:20, repHigh:20, alternatives:['Russian Twist']},
-      {name:'Russian Twist', category:'core', unit:'reps', sets:3, repLow:15, repHigh:15, alternatives:['Bicycle Crunch']},
-      {name:'Side Plank', category:'core', unit:'seconds', sets:3, repLow:30, repHigh:45, alternatives:['Plank']},
-      {name:'Bicycle Crunch', category:'core', unit:'reps', sets:2, repLow:20, repHigh:20, alternatives:['Russian Twist']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:4, repLow:30, repHigh:60, alternatives:['Knee Plank','Weighted Plank']},
+      {name:'Hanging Knee Raise', muscleGroup:'Core', unit:'reps', sets:3, repLow:12, repHigh:15, alternatives:['Lying Leg Raise']},
+      {name:'Mountain Climbers', muscleGroup:'Core', unit:'reps', sets:4, repLow:20, repHigh:20, alternatives:['Russian Twist']},
+      {name:'Russian Twist', muscleGroup:'Core', unit:'reps', sets:3, repLow:15, repHigh:15, alternatives:['Bicycle Crunch']},
+      {name:'Side Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:30, repHigh:45, alternatives:['Plank']},
+      {name:'Bicycle Crunch', muscleGroup:'Core', unit:'reps', sets:2, repLow:20, repHigh:20, alternatives:['Russian Twist']},
     ]},
   { id:'charlie_5', protocol:'Protocol Charlie', name:'Session 5 — Full Body Operator Test',
     briefing:'Combine everything Protocol Charlie has built — push, pull, legs, core, and conditioning — into a single full-body performance test.',
     trainingNote:'Protocol Charlie was never about lacking equipment. It was about proving capability comes from discipline first, equipment second.',
     conditioningOptions:['Vanguard Operator Test (Home Variant): 50 Air Squats / 40 Push-Ups / 30 Walking Lunges / 20 Inverted Rows / 100 Jumping Jacks, for time'],
     objectives:[
-      {name:'Push-Up', category:'pushups', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Incline Push-Up','Weighted Push-Up']},
-      {name:'Inverted Row', category:'back_row', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Resistance Band Row']},
-      {name:'Bodyweight Squat', category:'squats', unit:'reps', sets:4, repLow:20, repHigh:20, alternatives:['Jump Squat']},
-      {name:'Walking Lunge', category:'legs_unilateral', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Bulgarian Split Squat']},
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:45, repHigh:60, alternatives:['Side Plank']},
+      {name:'Push-Up', muscleGroup:'Chest', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Incline Push-Up','Weighted Push-Up']},
+      {name:'Inverted Row', muscleGroup:'Back', unit:'reps', sets:4, repLow:1, repHigh:99, alternatives:['Resistance Band Row']},
+      {name:'Bodyweight Squat', muscleGroup:'Quadriceps', unit:'reps', sets:4, repLow:20, repHigh:20, alternatives:['Jump Squat']},
+      {name:'Walking Lunge', muscleGroup:'Quadriceps', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Bulgarian Split Squat']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:45, repHigh:60, alternatives:['Side Plank']},
     ]},
 
   // Specialization-exclusive sessions — only shown once an operator has chosen the matching track.
@@ -548,50 +591,50 @@ const PROTOCOL_SESSIONS = [
     trainingNote:'Power isn\u2019t built in the comfortable rep ranges. Heavy Assault lives at the edge of what you can control.',
     conditioningOptions:['3 Rounds: Heavy Farmer Carry 40m / 90s Rest'],
     objectives:[
-      {name:'Barbell Back Squat', category:'squats', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Front Squat']},
-      {name:'Deadlift', category:'posterior_chain', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Trap Bar Deadlift']},
-      {name:'Barbell Bench Press', category:'chest_press', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Dumbbell Bench Press']},
-      {name:'Farmer Carry', category:'carry', unit:'reps', sets:3, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
+      {name:'Barbell Back Squat', muscleGroup:'Quadriceps', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Front Squat']},
+      {name:'Deadlift', muscleGroup:'Hamstrings', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Trap Bar Deadlift']},
+      {name:'Barbell Bench Press', muscleGroup:'Chest', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Dumbbell Bench Press']},
+      {name:'Farmer Carry', muscleGroup:'Grip', unit:'reps', sets:3, repLow:1, repHigh:1, alternatives:['Kettlebell Carry']},
     ]},
   { id:'spec_recon', protocol:'Recon Specialty', name:'Endurance Gauntlet', requiresSpecialization:'Recon',
     briefing:'Sustained output, adaptability under fatigue. This is Recon\u2019s signature session.',
     trainingNote:'Recon doesn\u2019t need to be the strongest in the room. Recon needs to still be moving when everyone else has stopped.',
     conditioningOptions:['20 Minute Continuous Effort: Run/Row/Bike, steady pace'],
     objectives:[
-      {name:'Running', category:'cardio_minutes', unit:'minutes', sets:1, repLow:20, repHigh:20, alternatives:['Rowing','Assault Bike Intervals']},
-      {name:'Jump Rope', category:'cardio_minutes', unit:'minutes', sets:1, repLow:10, repHigh:10, alternatives:['Jumping Jacks']},
-      {name:'Burpees', category:'conditioning', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Step-Back Burpee']},
-      {name:'Mountain Climbers', category:'core', unit:'reps', sets:4, repLow:30, repHigh:30, alternatives:['Russian Twist']},
+      {name:'Running', muscleGroup:'Cardio', unit:'minutes', sets:1, repLow:20, repHigh:20, alternatives:['Rowing','Assault Bike Intervals']},
+      {name:'Jump Rope', muscleGroup:'Cardio', unit:'minutes', sets:1, repLow:10, repHigh:10, alternatives:['Jumping Jacks']},
+      {name:'Burpees', muscleGroup:'Cardio', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Step-Back Burpee']},
+      {name:'Mountain Climbers', muscleGroup:'Core', unit:'reps', sets:4, repLow:30, repHigh:30, alternatives:['Russian Twist']},
     ]},
   { id:'spec_guardian', protocol:'Guardian Specialty', name:'Recovery & Mobility Session', requiresSpecialization:'Guardian',
     briefing:'Resilience through recovery, not just output. This is Guardian\u2019s signature session.',
     trainingNote:'A Guardian who never rests can\u2019t support anyone else for long. Recovery is the mission, not a break from it.',
     conditioningOptions:['15 Minute Easy Walk'],
     objectives:[
-      {name:'Plank', category:'core', unit:'seconds', sets:3, repLow:45, repHigh:60, alternatives:['Side Plank']},
-      {name:'Walking Lunge', category:'legs_unilateral', unit:'reps', sets:2, repLow:10, repHigh:10, alternatives:['Bulgarian Split Squat']},
-      {name:'Dead Bug', category:'core', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Bird Dog']},
-      {name:'Wall Sit', category:'legs_iso', unit:'seconds', sets:2, repLow:30, repHigh:45, alternatives:['Bodyweight Squat Hold']},
+      {name:'Plank', muscleGroup:'Core', unit:'seconds', sets:3, repLow:45, repHigh:60, alternatives:['Side Plank']},
+      {name:'Walking Lunge', muscleGroup:'Quadriceps', unit:'reps', sets:2, repLow:10, repHigh:10, alternatives:['Bulgarian Split Squat']},
+      {name:'Dead Bug', muscleGroup:'Core', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Bird Dog']},
+      {name:'Wall Sit', muscleGroup:'Quadriceps', unit:'seconds', sets:2, repLow:30, repHigh:45, alternatives:['Bodyweight Squat Hold']},
     ]},
   { id:'spec_demolitions', protocol:'Demolitions Expert Specialty', name:'Orbital Bombardment', requiresSpecialization:'Demolitions Expert',
     briefing:'Explosive power and metabolic conditioning. Drop a Hellbomb on your weak points — short, brutal, full of jumps, throws, and fast-twitch dominance.',
     trainingNote:'No wasted rest. No slow reps. This session is over before your heart rate agrees to it.',
     conditioningOptions:['5 Rounds: 30s Max Effort / 30s Rest, any implement'],
     objectives:[
-      {name:'Box Jump', category:'legs_unilateral', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Squat Jump']},
-      {name:'Kettlebell Swing', category:'conditioning', unit:'reps', sets:5, repLow:15, repHigh:20, alternatives:['Dumbbell Swing']},
-      {name:'Medicine Ball Slam', category:'conditioning', unit:'reps', sets:4, repLow:12, repHigh:12, alternatives:['Kettlebell Swing']},
-      {name:'Burpees', category:'conditioning', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Step-Back Burpee']},
+      {name:'Box Jump', muscleGroup:'Quadriceps', unit:'reps', sets:5, repLow:3, repHigh:5, alternatives:['Squat Jump']},
+      {name:'Kettlebell Swing', muscleGroup:'Glutes', unit:'reps', sets:5, repLow:15, repHigh:20, alternatives:['Dumbbell Swing']},
+      {name:'Medicine Ball Slam', muscleGroup:'Cardio', unit:'reps', sets:4, repLow:12, repHigh:12, alternatives:['Kettlebell Swing']},
+      {name:'Burpees', muscleGroup:'Cardio', unit:'reps', sets:4, repLow:15, repHigh:15, alternatives:['Step-Back Burpee']},
     ]},
   { id:'spec_marksman', protocol:'Marksman / Tactical Operator Specialty', name:'Precision Strike Protocol', requiresSpecialization:'Marksman / Tactical Operator',
     briefing:'Technique, core stability, unilateral strength, mobility under control. One shot, one kill — no wasted movement.',
     trainingNote:'Anyone can move heavy weight sloppily. Precision is choosing not to.',
     conditioningOptions:['10 Minutes Controlled-Tempo Movement Practice — no rushing, no shortcuts'],
     objectives:[
-      {name:'Pistol Squat', category:'legs_unilateral', unit:'reps', sets:3, repLow:5, repHigh:8, alternatives:['Bulgarian Split Squat','Assisted Pistol Squat']},
-      {name:'Turkish Get-Up', category:'core', unit:'reps', sets:3, repLow:3, repHigh:5, alternatives:['Single-Arm Overhead Carry']},
-      {name:'Single-Arm Overhead Press', category:'shoulder_press', unit:'reps', sets:3, repLow:8, repHigh:10, alternatives:['Seated Dumbbell Shoulder Press']},
-      {name:'Single-Arm Dumbbell Row', category:'back_row', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Barbell Row']},
+      {name:'Pistol Squat', muscleGroup:'Quadriceps', unit:'reps', sets:3, repLow:5, repHigh:8, alternatives:['Bulgarian Split Squat','Assisted Pistol Squat']},
+      {name:'Turkish Get-Up', muscleGroup:'Core', unit:'reps', sets:3, repLow:3, repHigh:5, alternatives:['Single-Arm Overhead Carry']},
+      {name:'Single-Arm Overhead Press', muscleGroup:'Shoulders', unit:'reps', sets:3, repLow:8, repHigh:10, alternatives:['Seated Dumbbell Shoulder Press']},
+      {name:'Single-Arm Dumbbell Row', muscleGroup:'Back', unit:'reps', sets:3, repLow:10, repHigh:10, alternatives:['Barbell Row']},
     ]},
 ];
 
@@ -599,10 +642,10 @@ const DEFAULT_CAMPAIGN_SEED = {
   id: 'first_light', name: 'OPERATION FIRST LIGHT', threat: 'KHARVAX SWARM', sector: 'The Hollow Reach',
   startDate: null, joinWindowDays: 5, durationDays: 28,
   locations: [
-    { id: 'theta', name: 'Landing Zone Theta', objective: 'Total push-ups', category: 'pushups', unit: 'push-ups', manualTarget: null },
-    { id: 'rust', name: 'The Rust Fields', objective: 'Total cardio minutes', category: 'cardio_minutes', unit: 'minutes', manualTarget: null },
-    { id: 'kappa', name: 'Signal Tower Kappa', objective: 'Total squats', category: 'squats', unit: 'squats', manualTarget: null },
-    { id: 'hollow', name: 'The Hollow', objective: 'Squad Support actions logged', category: 'support', unit: 'actions', manualTarget: 8 },
+    { id: 'theta', name: 'Landing Zone Theta', objective: 'Total chest volume', category: 'Chest', unit: 'reps', manualTarget: null },
+    { id: 'rust', name: 'The Rust Fields', objective: 'Total cardio minutes', category: 'Cardio', unit: 'minutes', manualTarget: null },
+    { id: 'kappa', name: 'Signal Tower Kappa', objective: 'Total quadriceps volume', category: 'Quadriceps', unit: 'reps', manualTarget: null },
+    { id: 'hollow', name: 'The Hollow', objective: 'Squad Support actions logged', category: 'Support', unit: 'actions', manualTarget: 8 },
   ],
   lockedAt: null, lockedTargets: null, lockedDeployedCount: 0,
   deployedOperatorIds: [], reinforcementsUsed: 0, resolved: null,
@@ -642,6 +685,17 @@ function campaignPhase(camp) {
   if (camp.resolved) return camp.resolved;
   if (!camp.lockedAt) return 'recruiting';
   return 'active';
+}
+
+// Narrative beats tied to Control % milestones — reused across every Campaign,
+// templated with that Campaign's own threat/sector so it never reads generic.
+function campaignMilestoneLine(camp, pct) {
+  if (camp.resolved === 'success') return `OPERATION ${camp.name.toUpperCase()}: SUCCESS. ${camp.sector} is secured. The ${camp.threat} has been pushed off this world — this Campaign's outcome is now part of the permanent record.`;
+  if (camp.resolved === 'failed') return `Time ran out. ${camp.sector} remains contested — not lost, not won. The ${camp.threat} regroups. This world will see another Campaign.`;
+  if (pct >= 75) return `The ${camp.threat} is in retreat across ${camp.sector}. One good push and this world falls. Finish it, Operators.`;
+  if (pct >= 50) return `${camp.sector} — halfway there. The ${camp.threat}'s positions are weakening. Command authorizes continued deployment.`;
+  if (pct >= 25) return `First contact confirmed in ${camp.sector}. Initial resistance from the ${camp.threat} noted. Command is watching.`;
+  return `Alpha Cell has made planetfall in ${camp.sector}. The ${camp.threat} doesn't know what's coming yet.`;
 }
 
 async function loadShared(key, fallback) {
@@ -687,6 +741,43 @@ function computeBaselineImprovement(operator) {
   return { score: Math.round(score), avgChange: Math.round(avgChange*10)/10 };
 }
 
+// Progressive Overload: compares trailing-30-day training volume against the
+// prior 30 days, per exercise, using logged sets/reps/weight — fully automatic,
+// no manual retest needed. Uses 30-day windows (not week-over-week) specifically
+// so a single deload week doesn't tank the score.
+function sessionVolume(logEntry) {
+  if (logEntry.sets && logEntry.sets.some(s => parseFloat(s.weight) > 0)) {
+    return logEntry.sets.reduce((s, st) => s + (parseFloat(st.reps)||0) * (parseFloat(st.weight)||0), 0);
+  }
+  return logEntry.totalValue || 0;
+}
+function computeProgressiveOverload(operatorId, logs) {
+  const opLogs = logs.filter(l => l.operatorId === operatorId && l.type === 'protocol');
+  if (opLogs.length === 0) return null;
+  const today = todayStr();
+  const recentCutoff = new Date(); recentCutoff.setDate(recentCutoff.getDate() - 29);
+  const priorCutoff = new Date(); priorCutoff.setDate(priorCutoff.getDate() - 59);
+  const recentStart = todayStr(recentCutoff), priorStart = todayStr(priorCutoff);
+
+  const byExercise = {};
+  opLogs.forEach(l => { (byExercise[l.exercise] = byExercise[l.exercise] || []).push(l); });
+
+  const changes = [];
+  Object.keys(byExercise).forEach(exName => {
+    const entries = byExercise[exName];
+    const recent = entries.filter(l => l.date >= recentStart && l.date <= today);
+    const prior = entries.filter(l => l.date >= priorStart && l.date < recentStart);
+    if (recent.length === 0 || prior.length === 0) return; // needs data in both windows
+    const recentAvg = recent.reduce((s,l)=>s+sessionVolume(l),0) / recent.length;
+    const priorAvg = prior.reduce((s,l)=>s+sessionVolume(l),0) / prior.length;
+    if (priorAvg > 0) changes.push(((recentAvg - priorAvg) / priorAvg) * 100);
+  });
+  if (changes.length === 0) return null;
+  const avgChange = changes.reduce((a,b)=>a+b,0) / changes.length;
+  const score = Math.max(0, Math.min(100, 50 + avgChange * 3));
+  return { score: Math.round(score), avgChange: Math.round(avgChange*10)/10, exerciseCount: changes.length };
+}
+
 function computeStreak(operatorId, logs) {
   const days = new Set(logs.filter(l=>l.operatorId===operatorId).map(l=>l.date));
   let streak = 0; let cursor = new Date();
@@ -708,7 +799,20 @@ function computeORS(operatorId, operator, logs) {
   const aarSubmissionRate = Math.min(100, (uniqueDaysWithLog / windowDays) * 100);
   const campaignActiveDayRate = Math.min(100, (uniqueCampaignDays / windowDays) * 100);
   const baselineImp = computeBaselineImprovement(operator);
-  const physicalVal = baselineImp ? (0.70*protocolCompletionRate + 0.30*baselineImp.score) : protocolCompletionRate;
+  const overload = computeProgressiveOverload(operatorId, logs);
+
+  // Physical Capability is itself a weighted blend of available sub-components:
+  // consistency (always available), progressive overload (auto, once there's
+  // enough logged history), and periodic baseline retest (manual, optional).
+  const physComponents = [
+    { weight: 0.50, value: protocolCompletionRate, available: true },
+    { weight: 0.30, value: overload ? overload.score : null, available: !!overload },
+    { weight: 0.20, value: baselineImp ? baselineImp.score : null, available: !!baselineImp },
+  ];
+  const physWeightSum = physComponents.filter(c=>c.available).reduce((s,c)=>s+c.weight,0);
+  let physicalVal = 0;
+  physComponents.forEach(c => { if (c.available) physicalVal += (c.weight/physWeightSum) * c.value; });
+
   const activeHabits = (operator.habits || []).filter(h => h.active);
   let personalDevVal = null;
   if (activeHabits.length > 0) {
@@ -728,7 +832,7 @@ function computeORS(operatorId, operator, logs) {
   ors = Math.round(ors);
   return { ors: ors, physical: Math.round(physicalVal), discipline: Math.round(aarSubmissionRate),
     squad: Math.round(campaignActiveDayRate), personalDev: personalDevVal!==null?Math.round(personalDevVal):null,
-    windowDays: windowDays, baselineImp: baselineImp };
+    windowDays: windowDays, baselineImp: baselineImp, overload: overload };
 }
 
 function nonCampaignMCP(operatorId, logs) {
@@ -859,12 +963,12 @@ function rowToCampaign(c, locs) {
     joinWindowDays: c.join_window_days, durationDays: c.duration_days, lockedAt: c.locked_at,
     lockedTargets: c.locked_targets, lockedDeployedCount: c.locked_deployed_count,
     deployedOperatorIds: c.deployed_operator_ids || [], reinforcementsUsed: c.reinforcements_used,
-    resolved: c.resolved, locations: (locs||[]).map(rowToLocation) };
+    resolved: c.resolved, lore: c.lore || '', locations: (locs||[]).map(rowToLocation) };
 }
 const CAMP_FIELD_MAP = { name:'name', threat:'threat', sector:'sector', joinWindowDays:'join_window_days',
   durationDays:'duration_days', lockedAt:'locked_at', lockedTargets:'locked_targets',
   lockedDeployedCount:'locked_deployed_count', deployedOperatorIds:'deployed_operator_ids',
-  reinforcementsUsed:'reinforcements_used', resolved:'resolved' };
+  reinforcementsUsed:'reinforcements_used', resolved:'resolved', lore:'lore' };
 function campaignToRowPatch(patch) {
   const row = {};
   Object.keys(patch).forEach(k => { if (CAMP_FIELD_MAP[k]) row[CAMP_FIELD_MAP[k]] = patch[k]; });
@@ -1369,9 +1473,9 @@ function App() {
 
       <div className="layout">
         <div className="nav">
-          {(op.isAdmin ? ['command','campaigns','log','myprotocols','habits','squad','dossier','roster','codex','comms','aar','admin'] : ['command','campaigns','log','myprotocols','habits','squad','dossier','roster','codex','comms','aar']).map(t => (
+          {(op.isAdmin ? ['command','campaigns','galaxy','log','myprotocols','habits','squad','dossier','roster','codex','comms','aar','admin'] : ['command','campaigns','galaxy','log','myprotocols','habits','squad','dossier','roster','codex','comms','aar']).map(t => (
             <div key={t} className={"nav-item"+(tab===t?" active":"")} onClick={() => {setTab(t); if(t==='dossier') setViewDossierId(op.id);}}>
-              {t==='command' && 'Command Center'}{t==='campaigns' && 'Campaigns'}{t==='log' && 'Log Activity'}
+              {t==='command' && 'Command Center'}{t==='campaigns' && 'Campaigns'}{t==='galaxy' && 'Galaxy Map'}{t==='log' && 'Log Activity'}
               {t==='myprotocols' && 'My Protocols'}{t==='habits' && 'Habits'}{t==='squad' && 'Squad'}{t==='dossier' && 'My Dossier'}{t==='roster' && 'Roster'}
               {t==='codex' && 'Codex'}{t==='comms' && 'Comms'}{t==='aar' && 'AAR Log'}{t==='admin' && 'Admin Panel'}
             </div>
@@ -1380,6 +1484,7 @@ function App() {
         <div className="main">
           {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} />}
           {tab==='campaigns' && <Campaigns campaigns={campaigns} activeOp={op} logs={logs} onDeploy={deployToCampaign} onUndeploy={undeploy} onClaimReinforcement={claimReinforcement} />}
+          {tab==='galaxy' && <GalaxyMap entries={codexEntries} campaigns={campaigns} logs={logs} onGoCampaigns={()=>setTab('campaigns')} />}
           {tab==='log' && <LogActivity deployedCampaign={deployedCampaignTop} activeOp={op} logs={logs} addLogs={addLogs} campaigns={campaigns} />}
           {tab==='myprotocols' && <MyProtocols op={op} onSave={saveCustomProtocol} onDelete={deleteCustomProtocol} />}
           {tab==='habits' && <Habits op={op} logs={logs} onAddHabit={addHabit} onToggleArchive={toggleHabitArchive} onCheckin={logHabitCheckin} />}
@@ -1450,6 +1555,7 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
           <div className="bracket-label">Your Deployment</div>
           <div className="disp panel-title">{deployedCampaign.name}</div>
           <div className="dim mono" style={{fontSize:12}}>Threat: {deployedCampaign.threat} · {deployedCampaign.sector} · {daysLeft} days remaining</div>
+          <div style={{fontSize:12,fontStyle:'italic',color:'var(--amber-dim)',marginTop:10}}>"{campaignMilestoneLine(deployedCampaign, planetPct)}"</div>
           <div style={{marginTop:18}} className="gauge-wrap">
             <Gauge pct={planetPct} />
             <div style={{flex:1,minWidth:220}}>
@@ -1462,6 +1568,12 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
               ))}
             </div>
           </div>
+          {deployedCampaign.lore && (
+            <details style={{marginTop:16}}>
+              <summary style={{cursor:'pointer',fontSize:11,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace",letterSpacing:'0.05em'}}>FULL BRIEFING</summary>
+              <div style={{fontSize:12,lineHeight:1.8,color:'var(--text-dim)',marginTop:10,whiteSpace:'pre-line'}}>{deployedCampaign.lore}</div>
+            </details>
+          )}
         </div>
       ) : (
         <div className="panel">
@@ -1536,6 +1648,13 @@ function Campaigns({ campaigns, activeOp, logs, onDeploy, onUndeploy, onClaimRei
               </span>
             </div>
             <div style={{marginTop:12,fontSize:12}}>Control: <span className="amber mono">{Math.round(planetPct)}%</span> · Deployed: {camp.deployedOperatorIds.length}{camp.lockedAt ? ` (locked at ${camp.lockedDeployedCount})` : ''}</div>
+            <div style={{fontSize:11,fontStyle:'italic',color:'var(--amber-dim)',marginTop:6}}>"{campaignMilestoneLine(camp, planetPct)}"</div>
+            {camp.lore && (
+              <details style={{marginTop:8}}>
+                <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace",letterSpacing:'0.05em'}}>FULL BRIEFING</summary>
+                <div style={{fontSize:11,lineHeight:1.7,color:'var(--text-dim)',marginTop:8,whiteSpace:'pre-line'}}>{camp.lore}</div>
+              </details>
+            )}
             <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap'}}>
               {isDeployed && <button className="ghost small" onClick={()=>onUndeploy(activeOp)}>Undeploy</button>}
               {!isDeployed && !deployedId && phase==='recruiting' && <button className="primary small" onClick={()=>onDeploy(activeOp, camp)}>Deploy</button>}
@@ -1740,6 +1859,86 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJo
   );
 }
 
+function planetFactionClass(planet) {
+  const text = (planet.title + ' ' + planet.body).toLowerCase();
+  if (text.includes('kharvax')) return 'faction-kharvax';
+  if (text.includes('voss')) return 'faction-voss';
+  if (text.includes('skarn')) return 'faction-skarn';
+  return 'faction-unknown';
+}
+function planetPosition(idx, total) {
+  const angle = (idx / Math.max(1,total)) * 2 * Math.PI - Math.PI/2;
+  const radiusX = 36, radiusY = 34;
+  const left = 50 + radiusX * Math.cos(angle);
+  const top = 50 + radiusY * Math.sin(angle);
+  return { left: left+'%', top: top+'%' };
+}
+function planetStatus(planet, campaigns, logs) {
+  const matches = campaigns.filter(c => c.sector === planet.title);
+  if (matches.length === 0) return { label: 'Uncharted', detail: null, campaign: null };
+  const active = matches.find(c => campaignPhase(c) === 'active' || campaignPhase(c) === 'recruiting');
+  if (active) {
+    const pct = Math.round(computePlanetControl(computeLocationProgress(active, logs)));
+    return { label: `Contested — ${pct}% Control`, detail: campaignPhase(active), campaign: active };
+  }
+  const success = matches.find(c => c.resolved === 'success');
+  if (success) return { label: 'Secured', detail: 'success', campaign: success };
+  const failed = matches.filter(c => c.resolved === 'failed');
+  if (failed.length) return { label: 'Contested (past Campaign failed)', detail: 'failed', campaign: failed[failed.length-1] };
+  return { label: 'Uncharted', detail: null, campaign: null };
+}
+
+function GalaxyMap({ entries, campaigns, logs, onGoCampaigns }) {
+  const [selected, setSelected] = useState(null);
+  const planets = entries.filter(e => e.category === 'Planets');
+  const selectedPlanet = selected ? planets.find(p=>p.id===selected) : null;
+  const selectedStatus = selectedPlanet ? planetStatus(selectedPlanet, campaigns, logs) : null;
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="bracket-label">Galactic Map</div>
+        <div className="galaxy-wrap">
+          <div className="galaxy-core">
+            <div className="galaxy-core-dot"></div>
+            <div className="galaxy-core-label">UEA CORE — SECURED</div>
+          </div>
+          {planets.map((p, idx) => {
+            const pos = planetPosition(idx, planets.length);
+            const status = planetStatus(p, campaigns, logs);
+            const factionClass = planetFactionClass(p);
+            return (
+              <div key={p.id} className={"planet-node "+factionClass} style={{left:pos.left, top:pos.top}} onClick={()=>setSelected(p.id)}>
+                <div className="planet-dot"></div>
+                <div className="planet-label" style={{color: selected===p.id?'var(--amber)':'var(--text-dim)'}}>{p.title}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="galaxy-legend">
+          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#E4572E'}}></div>Kharvax Swarm</div>
+          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#7CA9E8'}}></div>Voss Directorate</div>
+          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#6FCF97'}}></div>Skarn Collective</div>
+          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#8A93A6'}}></div>Unclaimed / Renders</div>
+        </div>
+      </div>
+
+      {selectedPlanet ? (
+        <div className="panel">
+          <div className="bracket-label">{selectedPlanet.title}</div>
+          <div style={{fontSize:13,lineHeight:1.8,color:'var(--text-dim)',marginBottom:14}}>{selectedPlanet.body}</div>
+          <div className="stat-row"><span>Status</span><span className="amber">{selectedStatus.label}</span></div>
+          {selectedStatus.campaign && (selectedStatus.detail==='active'||selectedStatus.detail==='recruiting') && (
+            <button className="primary small" style={{marginTop:10}} onClick={onGoCampaigns}>View Campaign</button>
+          )}
+        </div>
+      ) : (
+        <div className="panel"><div className="dim" style={{fontSize:12}}>Click a world to view its Codex entry and current Campaign status.</div></div>
+      )}
+    </div>
+  );
+}
+
 function Codex({ entries, isAdmin, onUpdate }) {
   const categories = ['Lore','Planets','Enemies','Philosophy'];
   const [activeCat, setActiveCat] = useState('Lore');
@@ -1821,7 +2020,7 @@ function MyProtocols({ op, onSave, onDelete }) {
   function startEdit(p) { setBuilding(true); setEditTarget(p.id); setName(p.name); setObjectives(p.objectives); }
   function addObjective() {
     const ex = EXERCISES.find(e=>e.name===exName);
-    setObjectives(objectives.concat([{name: ex.name, category: ex.category, unit: ex.unit, sets: 3, repLow: 10, repHigh: 12, alternatives: ex.alternatives}]));
+    setObjectives(objectives.concat([{name: ex.name, muscleGroup: ex.muscleGroup, unit: ex.unit, sets: 3, repLow: 10, repHigh: 12, alternatives: ex.alternatives}]));
   }
   function removeObjective(i) { setObjectives(objectives.filter((_,idx)=>idx!==i)); }
   async function save() {
@@ -1923,9 +2122,9 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns }) {
       const priorBest = personalBest(activeOp.id, logs, obj.name);
       if (priorBest !== null && totalValue > priorBest) prNotes.push(obj.name+' — new personal best! ('+totalValue+' vs previous '+priorBest+')');
       const ts = now + idx*2; const logId = 'log_'+ts;
-      entries.push({ id: logId, operatorId: activeOp.id, type:'protocol', date: todayStr(), timestamp: ts, protocolLabel: session.protocol, exercise: obj.name, variant: variantUsed, category: obj.category, unit: obj.unit, sets: setRows.filter(r=>r.reps), totalValue: totalValue, detail: setRows.filter(r=>r.reps).map(r=>(r.reps||0)+(r.weight?'@'+r.weight+'lb':'')).join(', ') });
+      entries.push({ id: logId, operatorId: activeOp.id, type:'protocol', date: todayStr(), timestamp: ts, protocolLabel: session.protocol, exercise: obj.name, variant: variantUsed, category: obj.muscleGroup, unit: obj.unit, sets: setRows.filter(r=>r.reps), totalValue: totalValue, detail: setRows.filter(r=>r.reps).map(r=>(r.reps||0)+(r.weight?'@'+r.weight+'lb':'')).join(', ') });
       if (deployedCampaign) {
-        const loc = findLocationForCategory(deployedCampaign, obj.category);
+        const loc = findLocationForCategory(deployedCampaign, obj.muscleGroup);
         if (loc) {
           const alreadyToday = logs.filter(l => l.type==='campaign' && l.campaignId===deployedCampaign.id && l.operatorId===activeOp.id && l.locationId===loc.id && l.date===todayStr()).concat(entries.filter(e2 => e2.type==='campaign' && e2.locationId===loc.id));
           const isFirst = alreadyToday.length === 0;
@@ -1953,7 +2152,7 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns }) {
     if (isTimeBased) { totalValue = parseFloat(duration) || 0; detail = totalValue + ' ' + exObj.unit; }
     else { totalValue = sets.reduce((s,st) => s + (parseFloat(st.reps)||0), 0); detail = sets.map(st => (st.reps||0)+(st.weight?'@'+st.weight+'lb':'')).join(', '); }
     if (totalValue <= 0) return;
-    setPending(pending.concat([{ exercise: exName, variant: variant, category: exObj.category, unit: exObj.unit, isTimeBased: isTimeBased, sets: isTimeBased ? [] : sets.filter(s=>s.reps), totalValue: totalValue, detail: detail }]));
+    setPending(pending.concat([{ exercise: exName, variant: variant, muscleGroup: exObj.muscleGroup, unit: exObj.unit, isTimeBased: isTimeBased, sets: isTimeBased ? [] : sets.filter(s=>s.reps), totalValue: totalValue, detail: detail }]));
     setSets([{reps:'',weight:''}]); setDuration('');
   }
   function removePending(i) { setPending(pending.filter((_,idx)=>idx!==i)); }
@@ -1965,9 +2164,9 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns }) {
       const priorBest = personalBest(activeOp.id, logs, ex.exercise);
       if (priorBest !== null && ex.totalValue > priorBest) prNotes.push(ex.exercise+' — new personal best!');
       const ts = now + i*2; const logId = 'log_'+ts;
-      entries.push({ id: logId, operatorId: activeOp.id, type:'protocol', date: todayStr(), timestamp: ts, protocolLabel: protocolLabel, exercise: ex.exercise, variant: ex.variant, category: ex.category, unit: ex.unit, sets: ex.sets, totalValue: ex.totalValue, detail: ex.detail });
+      entries.push({ id: logId, operatorId: activeOp.id, type:'protocol', date: todayStr(), timestamp: ts, protocolLabel: protocolLabel, exercise: ex.exercise, variant: ex.variant, category: ex.muscleGroup, unit: ex.unit, sets: ex.sets, totalValue: ex.totalValue, detail: ex.detail });
       if (deployedCampaign) {
-        const loc = findLocationForCategory(deployedCampaign, ex.category);
+        const loc = findLocationForCategory(deployedCampaign, ex.muscleGroup);
         if (loc) {
           const alreadyToday = logs.filter(l => l.type==='campaign' && l.campaignId===deployedCampaign.id && l.operatorId===activeOp.id && l.locationId===loc.id && l.date===todayStr()).concat(entries.filter(e2 => e2.type==='campaign' && e2.locationId===loc.id));
           const isFirst = alreadyToday.length === 0;
@@ -2187,6 +2386,11 @@ function Dossier({ op, operators, campaigns, logs, squads, onUpdateOperator }) {
             <div className="field-label" style={{marginBottom:4}}># Physical Capability</div>
             <div className="disp" style={{fontSize:20}}>{orsData.physical}</div>
             <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:orsData.physical+'%'}}></div></div>
+            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:4,lineHeight:1.6}}>
+              Blend of: Protocol Completion (always active)
+              {orsData.overload ? `, Progressive Overload (${orsData.overload.avgChange>0?'+':''}${orsData.overload.avgChange}% avg across ${orsData.overload.exerciseCount} exercise${orsData.overload.exerciseCount===1?'':'s'})` : ', Progressive Overload (needs 60+ days of repeated exercise logs to activate)'}
+              {orsData.baselineImp ? `, Baseline Improvement (${orsData.baselineImp.avgChange>0?'+':''}${orsData.baselineImp.avgChange}%)` : ', Baseline Improvement (needs a retest to activate)'}.
+            </div>
           </div>
           <div style={{marginBottom:18}}>
             <div className="field-label" style={{marginBottom:4}}># Mission Discipline</div>
@@ -2431,7 +2635,7 @@ function AdminPanel({ operators, campaigns, onUpdateOperators, onUpdateCampaigns
     locs[idx] = Object.assign({}, locs[idx], { [field]: field==='manualTarget' ? (val?Number(val):null) : val });
     setDraft(Object.assign({}, draft, {locations: locs}));
   }
-  function addLocation() { setDraft(Object.assign({}, draft, {locations: draft.locations.concat([{ id: 'loc_'+Date.now(), name: 'New Location', objective: 'Total reps', category: 'generic', unit: 'reps', manualTarget: null }])})); }
+  function addLocation() { setDraft(Object.assign({}, draft, {locations: draft.locations.concat([{ id: 'loc_'+Date.now(), name: 'New Location', objective: 'Total reps', category: 'Chest', unit: 'reps', manualTarget: null }])})); }
   function removeLocation(idx) { setDraft(Object.assign({}, draft, {locations: draft.locations.filter((_,i)=>i!==idx)})); }
   async function saveCampaign() {
     const exists = campaigns.some(c=>c.id===draft.id);
@@ -2476,7 +2680,7 @@ function AdminPanel({ operators, campaigns, onUpdateOperators, onUpdateCampaigns
         <div className="bracket-label">Admin — Campaigns</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
           {campaigns.map(c => <button key={c.id} className={editingId===c.id?'primary small':'ghost small'} onClick={()=>setEditingId(c.id)}>{c.name}</button>)}
-          <button className="ghost small" onClick={()=>{const id='camp_'+Date.now(); setEditingId(null); setDraft({id:id, name:'New Campaign', threat:'Unknown', sector:'Unassigned Sector', startDate: todayStr(), joinWindowDays:5, durationDays:28, locations:[], lockedAt:null, lockedTargets:null, lockedDeployedCount:0, deployedOperatorIds:[], reinforcementsUsed:0, resolved:null});}}>+ New Campaign</button>
+          <button className="ghost small" onClick={()=>{const id='camp_'+Date.now(); setEditingId(null); setDraft({id:id, name:'New Campaign', threat:'Unknown', sector:'Unassigned Sector', startDate: todayStr(), joinWindowDays:5, durationDays:28, locations:[], lockedAt:null, lockedTargets:null, lockedDeployedCount:0, deployedOperatorIds:[], reinforcementsUsed:0, resolved:null, lore:''});}}>+ New Campaign</button>
         </div>
         {draft && (
           <div>
@@ -2488,6 +2692,9 @@ function AdminPanel({ operators, campaigns, onUpdateOperators, onUpdateCampaigns
             <div className="grid2">
               <div className="field"><label>Join Window (days)</label><input type="number" value={draft.joinWindowDays} onChange={e=>setDraft(Object.assign({},draft,{joinWindowDays:Number(e.target.value)}))} /></div>
               <div className="field"><label>Duration (days)</label><input type="number" value={draft.durationDays} onChange={e=>setDraft(Object.assign({},draft,{durationDays:Number(e.target.value)}))} /></div>
+            </div>
+            <div className="field"><label>Full Lore Briefing (optional — shown as an expandable "Full Briefing" to deployed operators)</label>
+              <textarea value={draft.lore||''} onChange={e=>setDraft(Object.assign({},draft,{lore:e.target.value}))} rows="8" style={{width:'100%'}} placeholder="Write the deeper story behind this Campaign — why this world matters, what's at stake, who's already been lost..." />
             </div>
             <label style={{marginTop:8}}>Locations</label>
             {draft.locations.map((loc, idx) => (
