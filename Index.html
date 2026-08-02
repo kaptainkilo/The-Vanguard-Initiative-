@@ -983,7 +983,10 @@ function rowToLog(l) {
     source: l.source, sourceExercise: l.source_exercise, habitId: l.habit_id };
 }
 function logToRow(l) {
-  return { id: l.id, operator_id: l.operatorId, type: l.type, date: l.date, timestamp: l.timestamp,
+  // Deliberately no `id` field — the app builds client-side ids like 'log_...'
+  // for React keys/local dedup, but the DB column is a strict uuid type.
+  // Let Postgres's gen_random_uuid() default populate it instead.
+  return { operator_id: l.operatorId, type: l.type, date: l.date, timestamp: l.timestamp,
     protocol_label: l.protocolLabel || null, exercise: l.exercise || null, variant: l.variant || null,
     category: l.category || null, unit: l.unit || null, sets: l.sets || null,
     total_value: l.totalValue !== undefined ? l.totalValue : null, detail: l.detail || null,
@@ -992,7 +995,10 @@ function logToRow(l) {
     source_exercise: l.sourceExercise || null, habit_id: l.habitId || null };
 }
 function rowToChat(m) { return { id: m.id, authorId: m.author_id, authorName: m.author_name, isCommand: m.is_command, text: m.text, timestamp: Number(m.timestamp), channel: m.channel || 'main', squadId: m.squad_id || null }; }
-function chatToRow(m) { return { id: m.id, author_id: m.authorId, author_name: m.authorName, is_command: m.isCommand, text: m.text, timestamp: m.timestamp, channel: m.channel || 'main', squad_id: m.squadId || null }; }
+function chatToRow(m) {
+  // Same fix as logToRow — no client-generated id, let Postgres assign a real uuid.
+  return { author_id: m.authorId, author_name: m.authorName, is_command: m.isCommand, text: m.text, timestamp: m.timestamp, channel: m.channel || 'main', squad_id: m.squadId || null };
+}
 function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date }; }
 function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body }; }
 function rowToSquad(s, members) { return { id: s.id, name: s.name, createdAt: s.created_at, members: (members||[]).map(rowToSquadMember) }; }
