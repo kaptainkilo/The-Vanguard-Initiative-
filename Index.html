@@ -285,6 +285,26 @@ const COMMAND_QUIPS = [
 ];
 
 // EXERCISES and PROTOCOL_SESSIONS moved to the database (exercises / protocol_sessions tables) — fetched at load time, admin-editable in the Admin Panel.
+const CAMPAIGN_BASE_RATES = {
+  Chest: 125, Back: 90, Shoulders: 100, Biceps: 90, Triceps: 100,
+  Quadriceps: 100, Hamstrings: 80, Glutes: 80, Calves: 120, Core: 100,
+  Grip: 25, Cardio: 50, Support: 1,
+};
+const LOCATION_CATEGORIES = [
+  {id:'Chest', label:'Chest', unit:'reps'},
+  {id:'Back', label:'Back', unit:'reps'},
+  {id:'Shoulders', label:'Shoulders', unit:'reps'},
+  {id:'Biceps', label:'Biceps', unit:'reps'},
+  {id:'Triceps', label:'Triceps', unit:'reps'},
+  {id:'Quadriceps', label:'Quadriceps', unit:'reps'},
+  {id:'Hamstrings', label:'Hamstrings', unit:'reps'},
+  {id:'Glutes', label:'Glutes', unit:'reps'},
+  {id:'Calves', label:'Calves', unit:'reps'},
+  {id:'Core', label:'Core', unit:'reps'},
+  {id:'Grip', label:'Grip', unit:'reps'},
+  {id:'Cardio', label:'Cardio', unit:'minutes'},
+  {id:'Support', label:'Support Actions (async, engagement-type)', unit:'actions'},
+];
 const DEFAULT_CAMPAIGN_SEED = {
   id: 'first_light', name: 'OPERATION FIRST LIGHT', threat: 'KHARVAX SWARM', sector: 'The Hollow Reach',
   startDate: null, joinWindowDays: 5, durationDays: 28,
