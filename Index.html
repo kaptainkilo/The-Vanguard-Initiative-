@@ -8,16 +8,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --void:#0B0E14;
-    --panel:#131822;
-    --panel-alt:#1A2130;
-    --amber:#FFB238;
-    --amber-dim:#C98A2A;
-    --threat:#E4572E;
-    --text:#E8E6DD;
-    --text-dim:#8A93A6;
-    --success:#6FCF97;
-    --border:#2A3345;
+    --void:#0A0C0A;
+    --panel:#14170F;
+    --panel-alt:#1C2016;
+    --amber:#39FF14;
+    --amber-dim:#2E9E1E;
+    --threat:#FF4444;
+    --text:#E4E6DC;
+    --text-dim:#8A9080;
+    --success:#7A9B5C;
+    --border:#3B444B;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;}
@@ -254,36 +254,33 @@ const SPECIALIZATIONS = [
   {name:'Recon', desc:'Endurance and adaptability. Running, mobility, conditioning.'},
   {name:'Guardian', desc:'Resilience and support. Recovery, health, helping others.'},
   {name:'Demolitions Expert', desc:'"Orbital Bombardment." Explosive power and metabolic conditioning — plyometrics, power circuits, high-intensity finishers. Short, brutal sessions.'},
-  {name:'Marksman / Tactical Operator', desc:'"Precision Strike Protocol." Technique, core stability, unilateral strength, controlled tempo. Quality over quantity — one shot, one kill, no wasted movement.'},
+  {name:'Tactical Operator', desc:'"Precision Strike Protocol." Technique, core stability, unilateral strength, controlled tempo. Quality over quantity — one shot, one kill, no wasted movement.'},
 ];
-// Titles conferred automatically by role, not chosen — see updateOpField in AdminPanel.
-const CONFERRED_TITLES = { admin: 'Command', moderator: 'Engineer' };
-const RANK_ORDER = ['Recruit','Operator','Senior Operator','Specialist','Vanguard'];
-// Rank requirements now check three things: ORS, lifetime Days Active, and Campaigns Completed.
-const RANK_REQUIREMENTS = {
-  'Operator':        { ors:50, daysActive:14,  campaigns:0 },
-  'Senior Operator': { ors:65, daysActive:45,  campaigns:1 },
-  'Specialist':      { ors:75, daysActive:90,  campaigns:2 },
-  'Vanguard':        { ors:90, daysActive:180, campaigns:3 },
+// Command Staff / Jr Command Staff are conferred by role (Admin/Mod), not earned —
+// they override the computed rank entirely. See computeRank.
+const RANK_ORDER = ['Recruit','Operator','Senior Operator','Specialist','Vanguard','Jr Command Staff','Command Staff'];
+// Every earnable rank (all but the two conferred ones) has 3 tiers. Each tier's
+// requirements scale up within the rank; Tier 1 of a rank matches what used to
+// be that rank's single threshold.
+const RANK_TIER_REQUIREMENTS = {
+  'Recruit':          [ {ors:0,  daysActive:0,   campaigns:0}, {ors:20, daysActive:5,   campaigns:0}, {ors:35, daysActive:10,  campaigns:0} ],
+  'Operator':         [ {ors:50, daysActive:14,  campaigns:0}, {ors:55, daysActive:21,  campaigns:0}, {ors:60, daysActive:30,  campaigns:1} ],
+  'Senior Operator':  [ {ors:65, daysActive:45,  campaigns:1}, {ors:70, daysActive:60,  campaigns:1}, {ors:73, daysActive:75,  campaigns:2} ],
+  'Specialist':       [ {ors:75, daysActive:90,  campaigns:2}, {ors:78, daysActive:110, campaigns:2}, {ors:82, daysActive:135, campaigns:3} ],
+  'Vanguard':         [ {ors:90, daysActive:180, campaigns:3}, {ors:93, daysActive:220, campaigns:4}, {ors:96, daysActive:270, campaigns:5} ],
 };
+const EARNABLE_RANK_ORDER = ['Recruit','Operator','Senior Operator','Specialist','Vanguard'];
 
 const RANK_UP_LINES = {
   'Operator': "Recruit no more. Command has reviewed your file — consistency, not perfection, and it shows. Welcome to full operational status, Operator.",
   'Senior Operator': "Multiple Campaigns behind you now. Command doesn't hand out 'Senior' lightly. You've earned the weight of that word.",
   'Specialist': "Command has flagged your file for advanced standing. Whatever track you choose next, you've already proven you finish what you start.",
   'Vanguard': "There's a reason this rank has a name and not just a number. You are what the Initiative was built to create. Command salutes you.",
+  'Jr Command Staff': "You've been brought onto Command Staff in a junior capacity — moderation duties, more visibility, more trust. Command's watching to see what you do with it.",
+  'Command Staff': "Full Command Staff now. Whatever authority came with that, it came with the expectation you'll use it carefully. Welcome to the other side of the radio.",
 };
 
-const COMMAND_QUIPS = [
-  "High Command wants a report on 'operator morale.' I told them morale is high. I have no idea if that's true. Please make it true.",
-  "Reminder from Command: the Kharvax do not observe weekends. Neither, technically, do push-ups.",
-  "High Command approved a new commendation for 'Exceptional Hydration.' Please drink water. Please also stop asking why.",
-  "Command has been asked to remind everyone that 'creative interpretation' of a Protocol still counts, as long as the work actually happened.",
-  "Somewhere in the Hollow Reach, a Kharvax colony has no idea today is leg day. Let's keep it that way.",
-  "High Command sent a 40-page memo about 'synergy.' Command read page one. Command believes in you regardless.",
-  "Today's briefing is short: show up, log it, move on. The Swarm respects consistency more than heroics.",
-];
-
+// COMMAND_QUIPS moved to the database (command_quips table) — admin-editable in the Admin Panel.
 // EXERCISES and PROTOCOL_SESSIONS moved to the database (exercises / protocol_sessions tables) — fetched at load time, admin-editable in the Admin Panel.
 const CAMPAIGN_BASE_RATES = {
   Chest: 125, Back: 90, Shoulders: 100, Biceps: 90, Triceps: 100,
@@ -453,6 +450,29 @@ function computeStreak(operatorId, logs) {
   return streak;
 }
 
+const MUSCLE_GROUPS_LIST = ['Chest','Back','Shoulders','Biceps','Triceps','Quadriceps','Hamstrings','Glutes','Calves','Core','Grip','Cardio'];
+function computeMuscleFatigue(operatorId, logs) {
+  const opLogs = logs.filter(l => l.operatorId === operatorId && l.type === 'protocol');
+  return MUSCLE_GROUPS_LIST.map(mg => {
+    const relevant = opLogs.filter(l => l.category === mg);
+    if (relevant.length === 0) return { muscleGroup: mg, daysSince: null, status: 'Untrained' };
+    const lastDate = relevant.reduce((max,l) => l.date > max ? l.date : max, relevant[0].date);
+    const daysSince = daysBetween(lastDate, todayStr());
+    let status;
+    if (daysSince <= 1) status = 'Fatigued';
+    else if (daysSince <= 3) status = 'Recovering';
+    else if (daysSince <= 6) status = 'Fresh';
+    else status = 'Neglected';
+    return { muscleGroup: mg, daysSince: daysSince, status: status };
+  });
+}
+function fatigueColor(status) {
+  if (status==='Fatigued') return 'var(--threat)';
+  if (status==='Recovering') return 'var(--amber)';
+  if (status==='Fresh') return 'var(--success)';
+  return 'var(--text-dim)';
+}
+
 function computeORS(operatorId, operator, logs) {
   const opLogs = logs.filter(l => l.operatorId === operatorId);
   const firstLogDate = opLogs.length ? opLogs.reduce((min,l) => l.date < min ? l.date : min, opLogs[0].date) : todayStr();
@@ -549,26 +569,99 @@ function operatorRankStats(operatorId, logs, campaigns) {
   const campaignsCompleted = campaigns.filter(c => c.resolved === 'success' && opLogs.some(l => l.type === 'campaign' && l.campaignId === c.id)).length;
   return { daysActive, campaignsCompleted };
 }
-function computeRank(ors, operatorId, logs, campaigns, status) {
+function computeRank(ors, operatorId, logs, campaigns, status, isAdmin, isModerator) {
+  if (isAdmin) return 'Command Staff';
+  if (isModerator) return 'Jr Command Staff';
   const stats = operatorRankStats(operatorId, logs, campaigns);
-  for (let i = RANK_ORDER.length - 1; i >= 1; i--) {
-    const rank = RANK_ORDER[i];
-    const req = RANK_REQUIREMENTS[rank];
-    if (status.label === 'Active' && ors >= req.ors && stats.daysActive >= req.daysActive && stats.campaignsCompleted >= req.campaigns) return rank;
+  for (let i = EARNABLE_RANK_ORDER.length - 1; i >= 0; i--) {
+    const rank = EARNABLE_RANK_ORDER[i];
+    const tiers = RANK_TIER_REQUIREMENTS[rank];
+    for (let t = 2; t >= 0; t--) {
+      const req = tiers[t];
+      if (status.label === 'Active' && ors >= req.ors && stats.daysActive >= req.daysActive && stats.campaignsCompleted >= req.campaigns) return rank;
+    }
   }
   return 'Recruit';
 }
-function nextRankInfo(currentRank, ors, operatorId, logs, campaigns, status) {
-  const idx = RANK_ORDER.indexOf(currentRank);
-  if (idx === -1 || idx === RANK_ORDER.length - 1) return null;
-  const next = RANK_ORDER[idx+1];
-  const req = RANK_REQUIREMENTS[next];
+// Which of the 3 tiers within the current rank an operator has actually reached.
+// Command Staff / Jr Command Staff are conferred whole, always shown at Tier 3.
+function computeRankTier(rank, ors, operatorId, logs, campaigns) {
+  if (rank === 'Command Staff' || rank === 'Jr Command Staff') return 3;
+  const tiers = RANK_TIER_REQUIREMENTS[rank];
+  if (!tiers) return 1;
+  const stats = operatorRankStats(operatorId, logs, campaigns);
+  for (let t = 2; t >= 0; t--) {
+    const req = tiers[t];
+    if (ors >= req.ors && stats.daysActive >= req.daysActive && stats.campaignsCompleted >= req.campaigns) return t + 1;
+  }
+  return 1;
+}
+function nextRankInfo(currentRank, currentTier, ors, operatorId, logs, campaigns, status) {
+  if (currentRank === 'Command Staff' || currentRank === 'Jr Command Staff') return null; // conferred, not earned further this way
+  let nextRank, nextTier;
+  if (currentTier < 3) { nextRank = currentRank; nextTier = currentTier + 1; }
+  else {
+    const idx = EARNABLE_RANK_ORDER.indexOf(currentRank);
+    if (idx === -1 || idx === EARNABLE_RANK_ORDER.length - 1) return null; // Vanguard Tier 3 is the top of the earnable track
+    nextRank = EARNABLE_RANK_ORDER[idx+1]; nextTier = 1;
+  }
+  const req = RANK_TIER_REQUIREMENTS[nextRank][nextTier-1];
   const stats = operatorRankStats(operatorId, logs, campaigns);
   const eligible = status.label === 'Active' && ors >= req.ors && stats.daysActive >= req.daysActive && stats.campaignsCompleted >= req.campaigns;
-  return { next: next, req: req, stats: stats, eligible: eligible };
+  return { next: nextRank, nextTier: nextTier, req: req, stats: stats, eligible: eligible };
 }
-function dailyQuip(seed) { return COMMAND_QUIPS[Math.abs(seed) % COMMAND_QUIPS.length]; }
+function dailyQuip(seed, quips) { if (!quips || quips.length===0) return ''; return quips[Math.abs(seed) % quips.length]; }
 function hashStr(s) { let h=0; for (let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i))|0; } return h; }
+const TIER_ROMAN = ['I','II','III'];
+function rankDisplay(rank, tier) {
+  if (rank === 'Command Staff' || rank === 'Jr Command Staff') return rank;
+  return rank + ' ' + (TIER_ROMAN[tier-1] || 'I');
+}
+
+// Automated warnings/nudges — computed fresh each render from live data, not stored content.
+// Each entry: {id, severity: 'info'|'warning'|'urgent', text}
+function computeNotifications(op, orsData, status, deployedCampaign, campaigns, logs) {
+  const notes = [];
+
+  // Inactivity — tone escalates with how far status has decayed.
+  if (status.label === 'Alert') {
+    notes.push({ id:'inactive', severity:'warning', text: `Command hasn't seen you in ${status.days} days. Log something today to get back to Active.` });
+  } else if (status.label === 'Standby' || status.label === 'Reserve' || status.label === 'Deep Reserve') {
+    notes.push({ id:'inactive', severity:'urgent', text: `${status.days} days since your last log, Operator. You're at ${status.label} — rank-ups are on hold until you're Active again. Career progress is safe, but Command needs to see you.` });
+  } else {
+    // Active, but about to tip into Alert tomorrow if nothing gets logged today.
+    const opLogs = logs.filter(l => l.operatorId === op.id);
+    if (opLogs.length > 0) {
+      const lastDate = opLogs.reduce((max,l) => l.date > max ? l.date : max, opLogs[0].date);
+      const gap = daysBetween(lastDate, todayStr());
+      if (gap === 7) notes.push({ id:'streak-risk', severity:'info', text: `One more day and your status tips to Alert. Log something today to stay Active.` });
+    }
+  }
+
+  // Near rank-up — nudges only when genuinely close on every axis, not just ORS.
+  const rank = computeRank(orsData.ors, op.id, logs, campaigns, status, op.isAdmin, op.isModerator);
+  const rankTier = computeRankTier(rank, orsData.ors, op.id, logs, campaigns);
+  const nri = nextRankInfo(rank, rankTier, orsData.ors, op.id, logs, campaigns, status);
+  if (nri && !nri.eligible) {
+    const orsGap = nri.req.ors - orsData.ors;
+    const daysRatio = nri.req.daysActive > 0 ? nri.stats.daysActive / nri.req.daysActive : 1;
+    const campaignsOk = nri.stats.campaignsCompleted >= nri.req.campaigns;
+    if (orsGap <= 10 && orsGap > 0 && daysRatio >= 0.7 && campaignsOk && status.label === 'Active') {
+      notes.push({ id:'near-rank', severity:'info', text: `${orsGap} ORS from ${nri.next}. You're close, Operator.` });
+    }
+  }
+
+  // Campaign deadline — only fires if genuinely deployed and time is short.
+  if (deployedCampaign && campaignPhase(deployedCampaign) === 'active') {
+    const daysLeft = deployedCampaign.durationDays - daysBetween(deployedCampaign.startDate, todayStr());
+    const pct = computePlanetControl(computeLocationProgress(deployedCampaign, logs));
+    if (daysLeft <= 5 && daysLeft >= 0 && pct < 100) {
+      notes.push({ id:'campaign-deadline', severity: daysLeft<=2?'urgent':'warning', text: `${daysLeft} day${daysLeft===1?'':'s'} left on ${deployedCampaign.name}. Control at ${Math.round(pct)}%.` });
+    }
+  }
+
+  return notes;
+}
 
 function Gauge(props) {
   const pct = props.pct;
@@ -592,6 +685,81 @@ function SubBar(props) {
 function Avatar(props) {
   const op = props.op; const s = props.size || 52;
   return <div className="avatar" style={{width:s,height:s,fontSize:s*0.38,background:op.avatarColor}}>{op.callsign.charAt(0)}</div>;
+}
+
+// ---------- Rank Insignia (chevron progression, matching the reference art) ----------
+function RankInsignia({ rank, tier, size }) {
+  const s = size || 64;
+  const isCommandTrack = rank === 'Command Staff' || rank === 'Jr Command Staff';
+  const color = rank === 'Command Staff' ? '#F2C94C' : rank === 'Jr Command Staff' ? '#7CA9E8'
+    : rank === 'Vanguard' ? '#F2C94C' : rank === 'Specialist' ? '#E8E6DD'
+    : rank === 'Senior Operator' ? '#C9CDD6' : rank === 'Operator' ? '#A9AEB8' : '#8A93A6';
+  const hasBrackets = ['Operator','Senior Operator','Specialist','Vanguard'].includes(rank);
+  const hasCircle = ['Senior Operator','Specialist','Vanguard'].includes(rank);
+  const hasDiamond = ['Specialist','Vanguard'].includes(rank);
+  const dots = tier || 1;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+      <svg width={s} height={s} viewBox="0 0 64 64">
+        <polygon points="32,52 8,52 8,44 32,44 56,44 56,52" fill="none" />
+        {/* base chevron */}
+        <path d="M14 40 L32 24 L50 40 L44 40 L32 32 L20 40 Z" fill={color} opacity={isCommandTrack ? 0.25 : 1} stroke={color} strokeWidth="1.5" />
+        {isCommandTrack && (
+          <polygon points="32,14 35,22 44,22 37,27 39,36 32,31 25,36 27,27 20,22 29,22" fill={color} />
+        )}
+        {hasBrackets && !isCommandTrack && (
+          <g stroke={color} strokeWidth="2" fill="none">
+            <path d="M10 34 L4 40 L10 46" />
+            <path d="M54 34 L60 40 L54 46" />
+          </g>
+        )}
+        {hasCircle && !hasDiamond && (
+          <circle cx="32" cy="18" r="4" fill="none" stroke={color} strokeWidth="2" />
+        )}
+        {hasDiamond && (
+          <rect x="28" y="12" width="8" height="8" fill={color} transform="rotate(45 32 16)" />
+        )}
+      </svg>
+      <div style={{display:'flex',gap:3}}>
+        {[1,2,3].map(d => <div key={d} style={{width:5,height:5,borderRadius:'50%',background: d<=dots ? color : 'var(--border)'}}></div>)}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Specialist Armband icons ----------
+const SPECIALTY_ICONS = {
+  'Heavy Assault': (color) => <path d="M32 10 L38 20 L38 46 L26 46 L26 20 Z" fill={color} />,
+  'Recon': (color) => (
+    <g stroke={color} strokeWidth="2" fill="none">
+      <circle cx="32" cy="32" r="14" />
+      <line x1="32" y1="12" x2="32" y2="20" />
+      <line x1="32" y1="44" x2="32" y2="52" />
+      <line x1="12" y1="32" x2="20" y2="32" />
+      <line x1="44" y1="32" x2="52" y2="32" />
+      <circle cx="32" cy="32" r="3" fill={color} />
+    </g>
+  ),
+  'Guardian': (color) => <path d="M32 10 L48 16 L48 30 Q48 44 32 52 Q16 44 16 30 L16 16 Z" fill="none" stroke={color} strokeWidth="2.5" />,
+  'Demolitions Expert': (color) => <polygon points="32,8 37,24 52,20 40,32 52,44 37,40 32,56 27,40 12,44 24,32 12,20 27,24" fill={color} />,
+  'Tactical Operator': (color) => (
+    <g fill={color}>
+      <polygon points="32,8 36,34 28,34" />
+      <rect x="22" y="34" width="20" height="3" />
+      <rect x="30" y="37" width="4" height="14" />
+      <circle cx="32" cy="53" r="3" />
+    </g>
+  ),
+};
+function SpecialtyBadge({ specialization, size }) {
+  const s = size || 56;
+  if (!specialization || !SPECIALTY_ICONS[specialization]) return null;
+  return (
+    <div style={{width:s,height:s,borderRadius:'50%',background:'var(--panel-alt)',border:'2px solid var(--amber-dim)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <svg width={s*0.6} height={s*0.6} viewBox="0 0 64 64">{SPECIALTY_ICONS[specialization]('#C98A2A')}</svg>
+    </div>
+  );
 }
 
 // ============================================================
@@ -630,12 +798,13 @@ function rowToCampaign(c, locs) {
     joinWindowDays: c.join_window_days, durationDays: c.duration_days, lockedAt: c.locked_at,
     lockedTargets: c.locked_targets, lockedDeployedCount: c.locked_deployed_count,
     deployedOperatorIds: c.deployed_operator_ids || [], reinforcementsUsed: c.reinforcements_used,
-    resolved: c.resolved, lore: c.lore || '', locations: (locs||[]).map(rowToLocation) };
+    resolved: c.resolved, lore: c.lore || '', lastMilestoneNotified: c.last_milestone_notified || 0,
+    locations: (locs||[]).map(rowToLocation) };
 }
 const CAMP_FIELD_MAP = { name:'name', threat:'threat', sector:'sector', joinWindowDays:'join_window_days',
   durationDays:'duration_days', lockedAt:'locked_at', lockedTargets:'locked_targets',
   lockedDeployedCount:'locked_deployed_count', deployedOperatorIds:'deployed_operator_ids',
-  reinforcementsUsed:'reinforcements_used', resolved:'resolved', lore:'lore' };
+  reinforcementsUsed:'reinforcements_used', resolved:'resolved', lore:'lore', lastMilestoneNotified:'last_milestone_notified' };
 function campaignToRowPatch(patch) {
   const row = {};
   Object.keys(patch).forEach(k => { if (CAMP_FIELD_MAP[k]) row[CAMP_FIELD_MAP[k]] = patch[k]; });
@@ -668,10 +837,13 @@ function chatToRow(m) {
 }
 function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date }; }
 function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body }; }
+function rowToQuip(q) { return { id: q.id, text: q.text }; }
+function rowToAward(a) { return { id: a.id, operatorId: a.operator_id, awardType: a.award_type, title: a.title, description: a.description, awardedAt: a.awarded_at }; }
+function rowToPR(p) { return { id: p.id, operatorId: p.operator_id, exercise: p.exercise, value: Number(p.value), unit: p.unit, achievedAt: p.achieved_at }; }
 function rowToSquad(s, members) { return { id: s.id, name: s.name, createdAt: s.created_at, members: (members||[]).map(rowToSquadMember) }; }
 function rowToSquadMember(m) { return { operatorId: m.operator_id, role: m.role, joinedAt: m.joined_at }; }
-function rowToExercise(e) { return { id: e.id, name: e.name, muscleGroup: e.muscle_group, unit: e.unit, alternatives: e.alternatives || [] }; }
-function exerciseToRow(e) { return { name: e.name, muscle_group: e.muscleGroup, unit: e.unit, alternatives: e.alternatives || [] }; }
+function rowToExercise(e) { return { id: e.id, name: e.name, muscleGroup: e.muscle_group, unit: e.unit, alternatives: e.alternatives || [], secondaryMuscleGroups: e.secondary_muscle_groups || [] }; }
+function exerciseToRow(e) { return { name: e.name, muscle_group: e.muscleGroup, unit: e.unit, alternatives: e.alternatives || [], secondary_muscle_groups: e.secondaryMuscleGroups || [] }; }
 function rowToProtocolSession(s) {
   return { id: s.id, protocol: s.protocol, name: s.name, briefing: s.briefing, trainingNote: s.training_note,
     conditioningOptions: s.conditioning_options || [], requiresSpecialization: s.requires_specialization, objectives: s.objectives || [] };
@@ -840,7 +1012,7 @@ function MiniChat({ chat, activeOp, onGoComms }) {
             {recent.length === 0 && <div className="dim" style={{fontSize:11}}>No transmissions yet.</div>}
             {recent.map(m => (
               <div key={m.id} className="mini-chat-msg">
-                <div className="who">{m.isCommand ? 'COMMAND' : m.authorName}</div>
+                <div className="who">{!m.authorId ? 'VAL' : (m.isCommand ? 'COMMAND' : m.authorName)}</div>
                 <div>{m.text}</div>
               </div>
             ))}
@@ -891,7 +1063,16 @@ async function fetchAllData() {
   const { data: sessionRows } = await sb.from('protocol_sessions').select('*');
   const protocolSessions = (sessionRows||[]).map(rowToProtocolSession);
 
-  // auto-lock join windows / auto-resolve campaigns, writing back any changes
+  const { data: quipRows } = await sb.from('command_quips').select('*');
+  const quips = (quipRows||[]).map(rowToQuip);
+
+  const { data: awardRows } = await sb.from('awards').select('*').order('awarded_at', {ascending:false});
+  const awards = (awardRows||[]).map(rowToAward);
+
+  const { data: prRows } = await sb.from('personal_records').select('*').order('achieved_at', {ascending:false});
+  const personalRecords = (prRows||[]).map(rowToPR);
+
+  // auto-lock join windows / auto-resolve campaigns / auto-detect Control % milestones, writing back any changes
   for (let i = 0; i < camps.length; i++) {
     let c = camps[i];
     if (!c.lockedAt && daysBetween(c.startDate, todayStr()) >= c.joinWindowDays) {
@@ -906,10 +1087,18 @@ async function fetchAllData() {
       const pct = computePlanetControl(locProg);
       if (pct >= 100) { await sb.from('campaigns').update({resolved:'success'}).eq('id', c.id); camps[i] = Object.assign({}, c, {resolved:'success'}); }
       else if (daysBetween(c.startDate, todayStr()) >= c.durationDays) { await sb.from('campaigns').update({resolved:'failed'}).eq('id', c.id); camps[i] = Object.assign({}, c, {resolved:'failed'}); }
+      else {
+        // Milestone check — a DB trigger posts to chat the moment last_milestone_notified actually changes.
+        const crossed = pct>=75?75:pct>=50?50:pct>=25?25:0;
+        if (crossed > (c.lastMilestoneNotified||0)) {
+          await sb.from('campaigns').update({last_milestone_notified: crossed}).eq('id', c.id);
+          camps[i] = Object.assign({}, c, {lastMilestoneNotified: crossed});
+        }
+      }
     }
   }
 
-  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions };
+  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords };
 }
 
 function App() {
@@ -923,6 +1112,9 @@ function App() {
   const [squads, setSquads] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [protocolSessions, setProtocolSessions] = useState([]);
+  const [quips, setQuips] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [personalRecords, setPersonalRecords] = useState([]);
   const [tab, setTab] = useState('command');
   const [showReset, setShowReset] = useState(false);
   const [viewDossierId, setViewDossierId] = useState(null);
@@ -935,9 +1127,10 @@ function App() {
   }, []);
 
   async function refetchAll() {
-    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions } = await fetchAllData();
+    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords } = await fetchAllData();
     setOperators(ops); setCampaigns(camps); setLogs(lgs); setChat(ch); setCodexEntries(cx); setSquads(squads);
-    setExercises(exercises); setProtocolSessions(protocolSessions);
+    setExercises(exercises); setProtocolSessions(protocolSessions); setQuips(quips);
+    setAwards(awards); setPersonalRecords(personalRecords);
   }
 
   useEffect(() => {
@@ -1041,6 +1234,30 @@ function App() {
     await sb.from('protocol_sessions').delete().eq('id', sessionId);
     await refetchAll();
   }
+  async function saveQuip(text) {
+    if (!text.trim()) return;
+    await sb.from('command_quips').insert({ text: text.trim() });
+    await refetchAll();
+  }
+  async function deleteQuip(quipId) {
+    await sb.from('command_quips').delete().eq('id', quipId);
+    await refetchAll();
+  }
+  async function recordPersonalRecord(op, exercise, value, unit) {
+    await sb.from('personal_records').insert({ operator_id: op.id, exercise: exercise, value: value, unit: unit });
+    await sb.from('awards').insert({ operator_id: op.id, award_type: 'pr_'+exercise, title: 'Personal Best: '+exercise, description: 'New best of '+value+' '+unit+'.' });
+    // don't refetchAll here — the caller (addLogs) already triggers one, avoids a redundant round trip
+  }
+  async function checkStreakAward(op, logsSnapshot, existingAwards) {
+    const streak = computeStreak(op.id, logsSnapshot);
+    const milestones = [7, 30, 100];
+    for (const m of milestones) {
+      const type = 'streak_'+m;
+      if (streak >= m && !existingAwards.some(a=>a.operatorId===op.id && a.awardType===type)) {
+        await sb.from('awards').insert({ operator_id: op.id, award_type: type, title: m+'-Day Streak', description: 'Logged something '+m+' days in a row. Command noticed.' });
+      }
+    }
+  }
   async function resetAll() {
     await sb.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await sb.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -1140,7 +1357,7 @@ function App() {
   const opOnboarded = op && op.onboarded;
   const statusTop = opOnboarded ? computeReadinessStatus(op.id, logs) : null;
   const orsDataTop = opOnboarded ? computeORS(op.id, op, logs) : null;
-  const currentRankTop = opOnboarded ? computeRank(orsDataTop.ors, op.id, logs, campaigns, statusTop) : null;
+  const currentRankTop = opOnboarded ? computeRank(orsDataTop.ors, op.id, logs, campaigns, statusTop, op.isAdmin, op.isModerator) : null;
   const deployedCampaignTop = (opOnboarded && op.currentDeploymentId) ? campaigns.find(c => c.id === op.currentDeploymentId) : null;
 
   // Hook runs unconditionally every render and guards its own logic internally —
@@ -1152,6 +1369,12 @@ function App() {
       updateOperator(Object.assign({}, op, {lastSeenRank: currentRankTop}));
     }
   }, [currentRankTop, loaded, opOnboarded]);
+
+  const streakTop = (loaded && opOnboarded && op) ? computeStreak(op.id, logs) : 0;
+  useEffect(() => {
+    if (!loaded || !opOnboarded || !op) return;
+    checkStreakAward(op, logs, awards);
+  }, [streakTop, loaded, opOnboarded]);
 
   if (!session) return <Login onAuthed={()=>{}} />;
   if (!loaded) return <div style={{padding:40,fontFamily:'IBM Plex Mono, monospace',color:'#8A93A6'}}>ESTABLISHING UPLINK...</div>;
@@ -1194,23 +1417,24 @@ function App() {
           ))}
         </div>
         <div className="main">
-          {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} />}
+          {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} quips={quips} />}
           {tab==='campaigns' && <Campaigns campaigns={campaigns} activeOp={op} logs={logs} onDeploy={deployToCampaign} onUndeploy={undeploy} onClaimReinforcement={claimReinforcement} />}
           {tab==='galaxy' && <GalaxyMap entries={codexEntries} campaigns={campaigns} logs={logs} onGoCampaigns={()=>setTab('campaigns')} />}
-          {tab==='log' && <LogActivity deployedCampaign={deployedCampaignTop} activeOp={op} logs={logs} addLogs={addLogs} campaigns={campaigns} exercises={exercises} protocolSessions={protocolSessions} />}
+          {tab==='log' && <LogActivity deployedCampaign={deployedCampaignTop} activeOp={op} logs={logs} addLogs={addLogs} campaigns={campaigns} exercises={exercises} protocolSessions={protocolSessions} onRecordPR={recordPersonalRecord} />}
           {tab==='myprotocols' && <MyProtocols op={op} onSave={saveCustomProtocol} onDelete={deleteCustomProtocol} exercises={exercises} />}
           {tab==='habits' && <Habits op={op} logs={logs} onAddHabit={addHabit} onToggleArchive={toggleHabitArchive} onCheckin={logHabitCheckin} />}
           {tab==='squad' && <SquadTab activeOp={op} operators={operators} squads={squads} logs={logs} campaigns={campaigns}
             onCreate={createSquad} onJoin={joinSquad} onLeave={leaveSquad} onPromote={promoteOfficer} onDemote={demoteOfficer}
             onRemoveMember={removeMember} onRename={renameSquad} onDisband={disbandSquad} />}
-          {tab==='dossier' && <Dossier op={dossierOp} operators={operators} campaigns={campaigns} logs={logs} squads={squads} onUpdateOperator={updateOperator} />}
+          {tab==='dossier' && <Dossier op={dossierOp} operators={operators} campaigns={campaigns} logs={logs} squads={squads} awards={awards} personalRecords={personalRecords} onUpdateOperator={updateOperator} />}
           {tab==='roster' && <Roster operators={operators} campaigns={campaigns} logs={logs} onView={(id)=>{setViewDossierId(id); setTab('dossier');}} />}
           {tab==='codex' && <Codex entries={codexEntries} isAdmin={op.isAdmin} onUpdate={updateCodex} />}
           {tab==='comms' && <Comms chat={chat} operators={operators} squads={squads} activeOp={op} onSend={sendChat} />}
           {tab==='aar' && <AARLog operators={operators} campaigns={campaigns} logs={logs} />}
           {tab==='admin' && op.isAdmin && <AdminPanel operators={operators} campaigns={campaigns} onUpdateOperators={updateOperators} onUpdateCampaigns={updateCampaigns}
             exercises={exercises} protocolSessions={protocolSessions} onSaveExercise={saveExercise} onDeleteExercise={deleteExercise}
-            onSaveProtocolSession={saveProtocolSession} onDeleteProtocolSession={deleteProtocolSession} />}
+            onSaveProtocolSession={saveProtocolSession} onDeleteProtocolSession={deleteProtocolSession}
+            quips={quips} onSaveQuip={saveQuip} onDeleteQuip={deleteQuip} />}
         </div>
       </div>
 
@@ -1243,25 +1467,32 @@ function App() {
   );
 }
 
-function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign, onGoCampaigns, streak }) {
+function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign, onGoCampaigns, streak, quips }) {
   const orsData = computeORS(activeOp.id, activeOp, logs);
   const status = computeReadinessStatus(activeOp.id, logs);
-  const rank = computeRank(orsData.ors, activeOp.id, logs, campaigns, status);
+  const rank = computeRank(orsData.ors, activeOp.id, logs, campaigns, status, activeOp.isAdmin, activeOp.isModerator);
+  const rankTier = computeRankTier(rank, orsData.ors, activeOp.id, logs, campaigns);
   const locProgress = deployedCampaign ? computeLocationProgress(deployedCampaign, logs) : [];
   const planetPct = deployedCampaign ? computePlanetControl(locProgress) : 0;
   const daysLeft = deployedCampaign ? Math.max(0, deployedCampaign.durationDays - daysBetween(deployedCampaign.startDate, todayStr())) : 0;
-  const quip = dailyQuip(hashStr(todayStr()));
+  const quip = dailyQuip(hashStr(todayStr()), quips);
   const loggedToday = logs.some(l => l.operatorId===activeOp.id && l.date===todayStr());
+  const notifications = computeNotifications(activeOp, orsData, status, deployedCampaign, campaigns, logs);
 
   return (
     <div>
+      {notifications.map(n => (
+        <div key={n.id} className="panel" style={{borderColor: n.severity==='urgent'?'var(--threat)':n.severity==='warning'?'var(--amber)':'var(--border)', padding:'12px 16px', marginBottom:12}}>
+          <div style={{fontSize:12, color: n.severity==='urgent'?'var(--threat)':'var(--amber)'}}>{n.text}</div>
+        </div>
+      ))}
       <div className="panel">
         <div className="bracket-label">Sitrep — {todayStr()}</div>
         <div style={{fontSize:14,marginBottom:8}}>
           {loggedToday ? `Good work today, ${activeOp.callsign}.` : `Command hasn't seen you log anything today yet, ${activeOp.callsign}.`}
           {streak > 0 && <span> Current streak: <span className="amber mono">{streak} day{streak===1?'':'s'}</span>.</span>}
         </div>
-        <div style={{fontSize:12,color:'var(--text-dim)',fontStyle:'italic'}}>"{quip}"</div>
+        {quip && <div style={{fontSize:12,color:'var(--text-dim)',fontStyle:'italic'}}>"{quip}"</div>}
       </div>
 
       {deployedCampaign ? (
@@ -1300,7 +1531,11 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
       <div className="grid2">
         <div className="panel">
           <div className="bracket-label">Operator Status — {activeOp.callsign}</div>
-          <div className="stat-row"><span>Rank</span><span className="pill rank">{rank}</span></div>
+          <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:12}}>
+            <RankInsignia rank={rank} tier={rankTier} size={44} />
+            {activeOp.specialization && <SpecialtyBadge specialization={activeOp.specialization} size={40} />}
+          </div>
+          <div className="stat-row"><span>Rank</span><span className="pill rank">{rankDisplay(rank, rankTier)}</span></div>
           <div className="stat-row"><span>Readiness (ORS)</span><span className="stat-val">{orsData.ors} / 100</span></div>
           <div className="stat-row"><span>Status</span><span className={"status-pill "+status.cls}>{status.label}</span></div>
           <div className="sub-bars">
@@ -1355,1239 +1590,4 @@ function Campaigns({ campaigns, activeOp, logs, onDeploy, onUndeploy, onClaimRei
           <div key={camp.id} className={"campaign-card"+(isDeployed?' deployed':'')}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:8}}>
               <div><div className="disp" style={{fontSize:18}}>{camp.name}</div><div className="dim mono" style={{fontSize:11}}>{camp.threat} · {camp.sector}</div></div>
-              <span className={"status-tag "+(phase==='recruiting'?'recruiting':phase==='active'?'active':phase)}>
-                {phase==='recruiting' && `Recruiting (${joinWindowDaysLeft}d left)`}
-                {phase==='active' && `Active (${daysLeft}d left)`}
-                {phase==='success' && 'Victory'}{phase==='failed' && 'Contested'}
-              </span>
-            </div>
-            <div style={{marginTop:12,fontSize:12}}>Control: <span className="amber mono">{Math.round(planetPct)}%</span> · Deployed: {camp.deployedOperatorIds.length}{camp.lockedAt ? ` (locked at ${camp.lockedDeployedCount})` : ''}</div>
-            <div style={{fontSize:11,fontStyle:'italic',color:'var(--amber-dim)',marginTop:6}}>"{campaignMilestoneLine(camp, planetPct)}"</div>
-            {camp.lore && (
-              <details style={{marginTop:8}}>
-                <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace",letterSpacing:'0.05em'}}>FULL BRIEFING</summary>
-                <div style={{fontSize:11,lineHeight:1.7,color:'var(--text-dim)',marginTop:8,whiteSpace:'pre-line'}}>{camp.lore}</div>
-              </details>
-            )}
-            <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap'}}>
-              {isDeployed && <button className="ghost small" onClick={()=>onUndeploy(activeOp)}>Undeploy</button>}
-              {!isDeployed && !deployedId && phase==='recruiting' && <button className="primary small" onClick={()=>onDeploy(activeOp, camp)}>Deploy</button>}
-              {!isDeployed && !deployedId && phase==='active' && canDeployReinforcement && <button className="primary small" onClick={()=>onDeploy(activeOp, camp)}>Deploy (Reinforcement Drop)</button>}
-              {!isDeployed && deployedId && deployedId !== camp.id && <span className="dim" style={{fontSize:11}}>Already deployed elsewhere</span>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
-  const [newHabit, setNewHabit] = useState('');
-  const habits = op.habits || [];
-  const active = habits.filter(h=>h.active);
-  const archived = habits.filter(h=>!h.active);
-  function habitStreak(habitId) {
-    const days = new Set(logs.filter(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===habitId).map(l=>l.date));
-    let streak = 0; let cursor = new Date();
-    if (!days.has(todayStr())) cursor.setDate(cursor.getDate()-1);
-    while (days.has(todayStr(cursor))) { streak++; cursor.setDate(cursor.getDate()-1); }
-    return streak;
-  }
-  return (
-    <div>
-      <div className="panel">
-        <div className="bracket-label">Daily Habits</div>
-        <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:16}}>Habits feed the Personal Development slice of your ORS.</div>
-        {active.length === 0 && <div className="empty"><div className="empty-title">No active habits yet.</div></div>}
-        {active.map(h => {
-          const checkedToday = logs.some(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date===todayStr());
-          return (
-            <div key={h.id} className="field-row">
-              <span>{h.name} <span className="dim mono" style={{fontSize:10}}>({habitStreak(h.id)} day streak)</span></span>
-              <span style={{display:'flex',gap:8}}>
-                <button className={checkedToday?'primary small':'ghost small'} onClick={()=>onCheckin(op, h.id)} disabled={checkedToday}>{checkedToday?'Done Today':'Check In'}</button>
-                <button className="ghost small" onClick={()=>onToggleArchive(op, h.id)}>Archive</button>
-              </span>
-            </div>
-          );
-        })}
-        <div style={{display:'flex',gap:8,marginTop:16}}>
-          <input type="text" value={newHabit} onChange={e=>setNewHabit(e.target.value)} placeholder="e.g. Drink 64oz water" style={{flex:1}} />
-          <button className="primary" onClick={()=>{ if(newHabit.trim()){ onAddHabit(op, newHabit.trim()); setNewHabit(''); } }}>Add Habit</button>
-        </div>
-      </div>
-      {archived.length > 0 && (
-        <div className="panel">
-          <div className="bracket-label">Archived Habits</div>
-          {archived.map(h => <div key={h.id} className="field-row"><span className="dim">{h.name}</span><button className="ghost small" onClick={()=>onToggleArchive(op, h.id)}>Reactivate</button></div>)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function squadStats(squad, operators, campaigns, logs) {
-  const memberOps = squad.members.map(m => operators.find(o=>o.id===m.operatorId)).filter(Boolean);
-  const totalMCP = memberOps.reduce((s,o)=>s+computeMCP(o.id,campaigns,logs),0);
-  const avgORS = memberOps.length ? Math.round(memberOps.reduce((s,o)=>s+computeORS(o.id,o,logs).ors,0)/memberOps.length) : 0;
-  const campaignContribution = logs.filter(l=>l.type==='campaign' && memberOps.some(o=>o.id===l.operatorId)).reduce((s,l)=>s+(l.amount||0),0);
-  return { memberCount: memberOps.length, totalMCP, avgORS, campaignContribution };
-}
-
-function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJoin, onLeave, onPromote, onDemote, onRemoveMember, onRename, onDisband }) {
-  const [newSquadName, setNewSquadName] = useState('');
-  const [renaming, setRenaming] = useState(false);
-  const [renameVal, setRenameVal] = useState('');
-  const [confirmDisband, setConfirmDisband] = useState(false);
-  const [confirmLeave, setConfirmLeave] = useState(false);
-
-  const mySquad = activeOp.squadId ? squads.find(s=>s.id===activeOp.squadId) : null;
-
-  if (!mySquad) {
-    return (
-      <div>
-        <div className="panel">
-          <div className="bracket-label">Squads — Opt-In</div>
-          <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:16}}>Squads are entirely optional. Solo operators are never penalized for not joining one — ORS works the same either way.</div>
-          <div className="field"><label>Found a New Squad</label>
-            <div style={{display:'flex',gap:8}}>
-              <input type="text" value={newSquadName} onChange={e=>setNewSquadName(e.target.value)} placeholder="Squad name" style={{flex:1}} />
-              <button className="primary" onClick={()=>{ if(newSquadName.trim()){ onCreate(activeOp, newSquadName.trim()); setNewSquadName(''); } }}>Found Squad</button>
-            </div>
-          </div>
-        </div>
-        <div className="panel">
-          <div className="bracket-label">Browse Squads</div>
-          {squads.length === 0 && <div className="empty"><div className="empty-title">No squads exist yet.</div></div>}
-          {squads.map(s => {
-            const stats = squadStats(s, operators, campaigns, logs);
-            const full = stats.memberCount >= 10;
-            return (
-              <div key={s.id} className="protocol-card">
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div><strong>{s.name}</strong> <span className="dim" style={{fontSize:11}}>— {stats.memberCount}/10 members · Avg ORS {stats.avgORS}</span></div>
-                  <button className="primary small" disabled={full} onClick={()=>onJoin(activeOp, s)}>{full?'Full':'Join'}</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  const isLeader = activeOp.squadRole === 'leader';
-  const isLeadership = activeOp.squadRole === 'leader' || activeOp.squadRole === 'officer';
-  const officerCount = mySquad.members.filter(m=>m.role==='officer').length;
-  const memberOps = mySquad.members.map(m => {
-    const o = operators.find(o=>o.id===m.operatorId);
-    return o ? Object.assign({}, o, {role: m.role}) : null;
-  }).filter(Boolean);
-
-  const allStats = squads.map(s => ({ squad: s, stats: squadStats(s, operators, campaigns, logs) }));
-  const rankBy = (key) => allStats.slice().sort((a,b)=>b.stats[key]-a.stats[key]);
-
-  return (
-    <div>
-      <div className="panel">
-        <div className="dossier-header">
-          <div>
-            {renaming ? (
-              <div style={{display:'flex',gap:8}}>
-                <input type="text" value={renameVal} onChange={e=>setRenameVal(e.target.value)} />
-                <button className="primary small" onClick={()=>{onRename(mySquad, renameVal); setRenaming(false);}}>Save</button>
-                <button className="ghost small" onClick={()=>setRenaming(false)}>Cancel</button>
-              </div>
-            ) : (
-              <div className="disp" style={{fontSize:24}}>{mySquad.name}</div>
-            )}
-            <div className="dim mono" style={{fontSize:11}}>{memberOps.length}/10 members</div>
-          </div>
-          <span className="pill rank">{activeOp.squadRole}</span>
-        </div>
-
-        <table style={{marginBottom:16}}>
-          <thead><tr><th>Callsign</th><th>Role</th><th>ORS</th><th>MCP</th>{isLeadership && <th></th>}</tr></thead>
-          <tbody>
-            {memberOps.map(m => {
-              const ors = computeORS(m.id, m, logs).ors;
-              const mcp = computeMCP(m.id, campaigns, logs);
-              return (
-                <tr key={m.id}>
-                  <td className="disp" style={{fontFamily:"'Oswald',sans-serif"}}>{m.callsign}</td>
-                  <td>{m.role}</td>
-                  <td className="amber">{ors}</td>
-                  <td>{mcp}</td>
-                  {isLeadership && m.id !== activeOp.id && (
-                    <td style={{display:'flex',gap:6}}>
-                      {isLeader && m.role==='member' && officerCount<3 && <button className="small ghost" onClick={()=>onPromote(mySquad, m.id)}>Promote</button>}
-                      {isLeader && m.role==='officer' && <button className="small ghost" onClick={()=>onDemote(mySquad, m.id)}>Demote</button>}
-                      <button className="small ghost" onClick={()=>onRemoveMember(mySquad, m.id)}>Remove</button>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {isLeader && !renaming && <button className="ghost small" onClick={()=>{setRenaming(true); setRenameVal(mySquad.name);}}>Rename Squad</button>}
-          {isLeader && (confirmDisband ? (
-            <span style={{display:'flex',gap:6}}>
-              <button className="danger small" onClick={()=>onDisband(mySquad)}>Confirm Disband</button>
-              <button className="ghost small" onClick={()=>setConfirmDisband(false)}>Cancel</button>
-            </span>
-          ) : <button className="danger small" onClick={()=>setConfirmDisband(true)}>Disband Squad</button>)}
-          {!isLeader && (confirmLeave ? (
-            <span style={{display:'flex',gap:6}}>
-              <button className="danger small" onClick={()=>onLeave(activeOp)}>Confirm Leave</button>
-              <button className="ghost small" onClick={()=>setConfirmLeave(false)}>Cancel</button>
-            </span>
-          ) : <button className="ghost small" onClick={()=>setConfirmLeave(true)}>Leave Squad</button>)}
-        </div>
-      </div>
-
-      <div className="grid2">
-        <div className="panel">
-          <div className="bracket-label">Leaderboard — MCP</div>
-          {rankBy('totalMCP').slice(0,5).map((r,i) => (
-            <div key={r.squad.id} className="stat-row"><span>{i+1}. {r.squad.name}</span><span className="stat-val">{r.stats.totalMCP}</span></div>
-          ))}
-        </div>
-        <div className="panel">
-          <div className="bracket-label">Leaderboard — Average ORS</div>
-          {rankBy('avgORS').slice(0,5).map((r,i) => (
-            <div key={r.squad.id} className="stat-row"><span>{i+1}. {r.squad.name}</span><span className="stat-val">{r.stats.avgORS}</span></div>
-          ))}
-        </div>
-      </div>
-      <div className="panel">
-        <div className="bracket-label">Leaderboard — Campaign Contribution</div>
-        {rankBy('campaignContribution').slice(0,5).map((r,i) => (
-          <div key={r.squad.id} className="stat-row"><span>{i+1}. {r.squad.name}</span><span className="stat-val">{Math.round(r.stats.campaignContribution)}</span></div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function planetFactionClass(planet) {
-  const text = (planet.title + ' ' + planet.body).toLowerCase();
-  if (text.includes('kharvax')) return 'faction-kharvax';
-  if (text.includes('voss')) return 'faction-voss';
-  if (text.includes('skarn')) return 'faction-skarn';
-  return 'faction-unknown';
-}
-function planetPosition(idx, total) {
-  const angle = (idx / Math.max(1,total)) * 2 * Math.PI - Math.PI/2;
-  const radiusX = 36, radiusY = 34;
-  const left = 50 + radiusX * Math.cos(angle);
-  const top = 50 + radiusY * Math.sin(angle);
-  return { left: left+'%', top: top+'%' };
-}
-function planetStatus(planet, campaigns, logs) {
-  const matches = campaigns.filter(c => c.sector === planet.title);
-  if (matches.length === 0) return { label: 'Uncharted', detail: null, campaign: null };
-  const active = matches.find(c => campaignPhase(c) === 'active' || campaignPhase(c) === 'recruiting');
-  if (active) {
-    const pct = Math.round(computePlanetControl(computeLocationProgress(active, logs)));
-    return { label: `Contested — ${pct}% Control`, detail: campaignPhase(active), campaign: active };
-  }
-  const success = matches.find(c => c.resolved === 'success');
-  if (success) return { label: 'Secured', detail: 'success', campaign: success };
-  const failed = matches.filter(c => c.resolved === 'failed');
-  if (failed.length) return { label: 'Contested (past Campaign failed)', detail: 'failed', campaign: failed[failed.length-1] };
-  return { label: 'Uncharted', detail: null, campaign: null };
-}
-
-function GalaxyMap({ entries, campaigns, logs, onGoCampaigns }) {
-  const [selected, setSelected] = useState(null);
-  const planets = entries.filter(e => e.category === 'Planets');
-  const selectedPlanet = selected ? planets.find(p=>p.id===selected) : null;
-  const selectedStatus = selectedPlanet ? planetStatus(selectedPlanet, campaigns, logs) : null;
-
-  return (
-    <div>
-      <div className="panel">
-        <div className="bracket-label">Galactic Map</div>
-        <div className="galaxy-wrap">
-          <div className="galaxy-core">
-            <div className="galaxy-core-dot"></div>
-            <div className="galaxy-core-label">UEA CORE — SECURED</div>
-          </div>
-          {planets.map((p, idx) => {
-            const pos = planetPosition(idx, planets.length);
-            const status = planetStatus(p, campaigns, logs);
-            const factionClass = planetFactionClass(p);
-            return (
-              <div key={p.id} className={"planet-node "+factionClass} style={{left:pos.left, top:pos.top}} onClick={()=>setSelected(p.id)}>
-                <div className="planet-dot"></div>
-                <div className="planet-label" style={{color: selected===p.id?'var(--amber)':'var(--text-dim)'}}>{p.title}</div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="galaxy-legend">
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#E4572E'}}></div>Kharvax Swarm</div>
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#7CA9E8'}}></div>Voss Directorate</div>
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#6FCF97'}}></div>Skarn Collective</div>
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#8A93A6'}}></div>Unclaimed / Renders</div>
-        </div>
-      </div>
-
-      {selectedPlanet ? (
-        <div className="panel">
-          <div className="bracket-label">{selectedPlanet.title}</div>
-          <div style={{fontSize:13,lineHeight:1.8,color:'var(--text-dim)',marginBottom:14}}>{selectedPlanet.body}</div>
-          <div className="stat-row"><span>Status</span><span className="amber">{selectedStatus.label}</span></div>
-          {selectedStatus.campaign && (selectedStatus.detail==='active'||selectedStatus.detail==='recruiting') && (
-            <button className="primary small" style={{marginTop:10}} onClick={onGoCampaigns}>View Campaign</button>
-          )}
-        </div>
-      ) : (
-        <div className="panel"><div className="dim" style={{fontSize:12}}>Click a world to view its Codex entry and current Campaign status.</div></div>
-      )}
-    </div>
-  );
-}
-
-function Codex({ entries, isAdmin, onUpdate }) {
-  const categories = ['Lore','Planets','Enemies','Philosophy'];
-  const [activeCat, setActiveCat] = useState('Lore');
-  const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({title:'',body:''});
-  const [adding, setAdding] = useState(false);
-
-  function startEdit(entry) { setEditingId(entry.id); setDraft({title:entry.title, body:entry.body}); }
-  function saveEdit() {
-    onUpdate(entries.map(e => e.id===editingId ? Object.assign({}, e, draft) : e));
-    setEditingId(null);
-  }
-  function saveNew() {
-    if (!draft.title.trim()) return;
-    onUpdate(entries.concat([{id:'codex_'+Date.now(), category:activeCat, title:draft.title, body:draft.body}]));
-    setDraft({title:'',body:''}); setAdding(false);
-  }
-  function deleteEntry(id) { onUpdate(entries.filter(e=>e.id!==id)); }
-
-  const shown = entries.filter(e=>e.category===activeCat);
-
-  return (
-    <div className="panel">
-      <div className="bracket-label">Vanguard Codex</div>
-      <div className="codex-cat-tabs">
-        {categories.map(c => <button key={c} className={activeCat===c?'primary small':'ghost small'} onClick={()=>{setActiveCat(c); setEditingId(null); setAdding(false);}}>{c}</button>)}
-      </div>
-      {shown.length === 0 && <div className="empty"><div className="empty-title">No entries in {activeCat} yet.</div></div>}
-      {shown.map(entry => (
-        <div key={entry.id} className="codex-entry">
-          {editingId === entry.id ? (
-            <div>
-              <input type="text" value={draft.title} onChange={e=>setDraft(Object.assign({},draft,{title:e.target.value}))} style={{marginBottom:8}} />
-              <textarea value={draft.body} onChange={e=>setDraft(Object.assign({},draft,{body:e.target.value}))} rows="4" style={{width:'100%',marginBottom:8}} />
-              <div style={{display:'flex',gap:8}}>
-                <button className="primary small" onClick={saveEdit}>Save</button>
-                <button className="ghost small" onClick={()=>setEditingId(null)}>Cancel</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="codex-entry-head">
-                <div className="disp amber" style={{fontSize:15}}>{entry.title}</div>
-                {isAdmin && <span style={{display:'flex',gap:6,flexShrink:0}}>
-                  <button className="ghost small" onClick={()=>startEdit(entry)}>Edit</button>
-                  <button className="ghost small" onClick={()=>deleteEntry(entry.id)}>Delete</button>
-                </span>}
-              </div>
-              <div style={{fontSize:12,lineHeight:1.7,color:'var(--text-dim)',marginTop:6}}>{entry.body}</div>
-            </div>
-          )}
-        </div>
-      ))}
-      {isAdmin && !adding && <button className="ghost small" onClick={()=>{setAdding(true); setDraft({title:'',body:''});}}>+ Add {activeCat} Entry</button>}
-      {isAdmin && adding && (
-        <div className="codex-entry">
-          <input type="text" value={draft.title} onChange={e=>setDraft(Object.assign({},draft,{title:e.target.value}))} placeholder="Title" style={{marginBottom:8}} />
-          <textarea value={draft.body} onChange={e=>setDraft(Object.assign({},draft,{body:e.target.value}))} placeholder="Body text" rows="4" style={{width:'100%',marginBottom:8}} />
-          <div style={{display:'flex',gap:8}}>
-            <button className="primary small" onClick={saveNew}>Add Entry</button>
-            <button className="ghost small" onClick={()=>setAdding(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MyProtocols({ op, onSave, onDelete, exercises }) {
-  const [building, setBuilding] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [name, setName] = useState('');
-  const [objectives, setObjectives] = useState([]);
-  const [exName, setExName] = useState(exercises[0] ? exercises[0].name : '');
-  const custom = op.customProtocols || [];
-  const cap = 5;
-
-  if (exercises.length === 0) {
-    return <div className="panel"><div className="empty"><div className="empty-title">Exercise library not loaded.</div><div>Run exercises_and_sessions_to_db.sql in Supabase, then refresh.</div></div></div>;
-  }
-
-  function startNew() { setBuilding(true); setEditTarget(null); setName(''); setObjectives([]); }
-  function startEdit(p) { setBuilding(true); setEditTarget(p.id); setName(p.name); setObjectives(p.objectives); }
-  function addObjective() {
-    const ex = exercises.find(e=>e.name===exName);
-    setObjectives(objectives.concat([{name: ex.name, muscleGroup: ex.muscleGroup, unit: ex.unit, sets: 3, repLow: 10, repHigh: 12, alternatives: ex.alternatives}]));
-  }
-  function removeObjective(i) { setObjectives(objectives.filter((_,idx)=>idx!==i)); }
-  async function save() {
-    if (!name.trim() || objectives.length===0) return;
-    const ok = await onSave(op, {id: editTarget || 'custom_'+Date.now(), name: name.trim(), objectives: objectives});
-    if (ok === false) { alert('Custom Protocol limit reached ('+cap+' max). Delete one first.'); return; }
-    setBuilding(false);
-  }
-
-  return (
-    <div>
-      <div className="panel">
-        <div className="bracket-label">My Protocols — Custom Sessions ({custom.length}/{cap})</div>
-        <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:16}}>Build your own session templates using any exercise in the library. Log against them the same way as built-in Protocol sessions.</div>
-        {custom.length === 0 && <div className="empty"><div className="empty-title">No custom Protocols yet.</div></div>}
-        {custom.map(p => (
-          <div key={p.id} className="protocol-card">
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div><strong>{p.name}</strong> <span className="dim" style={{fontSize:11}}>— {p.objectives.length} exercise(s)</span></div>
-              <span style={{display:'flex',gap:6}}>
-                <button className="ghost small" onClick={()=>startEdit(p)}>Edit</button>
-                <button className="ghost small" onClick={()=>onDelete(op, p.id)}>Delete</button>
-              </span>
-            </div>
-          </div>
-        ))}
-        {custom.length < cap && !building && <button className="primary" onClick={startNew} style={{marginTop:8}}>+ New Custom Protocol</button>}
-        {custom.length >= cap && !building && <div className="info-note">Limit reached — delete an existing custom Protocol to add a new one.</div>}
-      </div>
-
-      {building && (
-        <div className="panel">
-          <div className="bracket-label">{editTarget ? 'Edit' : 'Build'} Custom Protocol</div>
-          <div className="field"><label>Protocol Name</label><input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. My Saturday Circuit" /></div>
-          <div className="field">
-            <label>Add Exercise</label>
-            <div style={{display:'flex',gap:8}}>
-              <select style={{flex:1}} value={exName} onChange={e=>setExName(e.target.value)}>{exercises.map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}</select>
-              <button className="ghost" onClick={addObjective}>Add</button>
-            </div>
-          </div>
-          {objectives.map((o,i) => (
-            <div key={i} className="exercise-pending">
-              <div>{o.name} — {o.sets}×{o.repLow}-{o.repHigh} {o.unit}</div>
-              <button className="small ghost" onClick={()=>removeObjective(i)}>Remove</button>
-            </div>
-          ))}
-          <div style={{display:'flex',gap:10,marginTop:16}}>
-            <button className="primary" onClick={save}>Save Protocol</button>
-            <button className="ghost" onClick={()=>setBuilding(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function personalBest(operatorId, logs, exerciseName) {
-  const prior = logs.filter(l => l.type==='protocol' && l.operatorId===operatorId && l.exercise===exerciseName);
-  if (prior.length === 0) return null;
-  return Math.max.apply(null, prior.map(l=>l.totalValue));
-}
-
-function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns, exercises, protocolSessions }) {
-  const builtInSessions = protocolSessions.filter(s => !s.requiresSpecialization || s.requiresSpecialization === activeOp.specialization);
-  const combinedSessions = builtInSessions.concat((activeOp.customProtocols||[]).map(cp => ({
-    id: cp.id, protocol: 'Custom', name: cp.name, objectives: cp.objectives, briefing: null, trainingNote: null, conditioningOptions: []
-  })));
-
-  const [mode, setMode] = useState('structured');
-  const [sessionId, setSessionId] = useState(combinedSessions[0] ? combinedSessions[0].id : '');
-  const [objSets, setObjSets] = useState({});
-  const [objVariant, setObjVariant] = useState({});
-  const [feedback, setFeedback] = useState(null);
-  const [protocolLabel, setProtocolLabel] = useState('Protocol Alpha');
-  const [pending, setPending] = useState([]);
-  const [exName, setExName] = useState(exercises[0] ? exercises[0].name : '');
-  const [variant, setVariant] = useState(exercises[0] ? exercises[0].name : '');
-  const [sets, setSets] = useState([{reps:'', weight:''}]);
-  const [duration, setDuration] = useState('');
-  const [locationId, setLocationId] = useState(null);
-  const [amount, setAmount] = useState('');
-
-  if (exercises.length === 0 || protocolSessions.length === 0) {
-    return <div className="panel"><div className="empty"><div className="empty-title">Exercise or Protocol Session library not loaded.</div><div>Run exercises_and_sessions_to_db.sql in Supabase, then refresh.</div></div></div>;
-  }
-
-  const session = combinedSessions.find(s => s.id === sessionId) || combinedSessions[0];
-  function getObjSets(idx, obj) { if (objSets[idx]) return objSets[idx]; return Array.from({length: obj.sets}, () => ({reps:'', weight:''})); }
-  function updateObjSet(idx, setIdx, field, val) {
-    const cur = getObjSets(idx, session.objectives[idx]).slice();
-    cur[setIdx] = Object.assign({}, cur[setIdx], {[field]: val});
-    setObjSets(Object.assign({}, objSets, {[idx]: cur}));
-  }
-
-  async function submitStructuredSession() {
-    const entries = []; const now = Date.now(); const autoNotes = []; const prNotes = [];
-    session.objectives.forEach((obj, idx) => {
-      const setRows = getObjSets(idx, obj);
-      const totalValue = setRows.reduce((s,r)=> s + (parseFloat(r.reps)||0), 0);
-      if (totalValue <= 0) return;
-      const variantUsed = objVariant[idx] || obj.name;
-      const priorBest = personalBest(activeOp.id, logs, obj.name);
-      if (priorBest !== null && totalValue > priorBest) prNotes.push(obj.name+' — new personal best! ('+totalValue+' vs previous '+priorBest+')');
-      const ts = now + idx*2; const logId = 'log_'+ts;
-      entries.push({ id: logId, operatorId: activeOp.id, type:'protocol', date: todayStr(), timestamp: ts, protocolLabel: session.protocol, exercise: obj.name, variant: variantUsed, category: obj.muscleGroup, unit: obj.unit, sets: setRows.filter(r=>r.reps), totalValue: totalValue, detail: setRows.filter(r=>r.reps).map(r=>(r.reps||0)+(r.weight?'@'+r.weight+'lb':'')).join(', ') });
-      if (deployedCampaign) {
-        const loc = findLocationForCategory(deployedCampaign, obj.muscleGroup);
-        if (loc) {
-          const alreadyToday = logs.filter(l => l.type==='campaign' && l.campaignId===deployedCampaign.id && l.operatorId===activeOp.id && l.locationId===loc.id && l.date===todayStr()).concat(entries.filter(e2 => e2.type==='campaign' && e2.locationId===loc.id));
-          const isFirst = alreadyToday.length === 0;
-          entries.push({ id: logId+'_auto', operatorId: activeOp.id, type:'campaign', campaignId: deployedCampaign.id, locationId: loc.id, amount: totalValue, date: todayStr(), timestamp: ts+1, source:'protocol-auto', sourceExercise: obj.name });
-          autoNotes.push(obj.name+' ('+totalValue+' '+obj.unit+') auto-credited to '+loc.name+(isFirst?'':' at half value (soft cap)'));
-        }
-      }
-    });
-    if (entries.length === 0) { setFeedback({cap:false,text:'Log at least one set before submitting.'}); return; }
-    await addLogs(entries);
-    let text = session.name+' logged, '+activeOp.callsign+'.';
-    if (prNotes.length) text += ' ' + prNotes.join(' ');
-    text += autoNotes.length ? ' '+autoNotes.join('. ')+'.' : (deployedCampaign ? ' No matching Location for this session\u2019s exercises.' : ' Not currently deployed \u2014 no Campaign credit applied.');
-    setFeedback({ win:true, text: text });
-    setObjSets({}); setObjVariant({});
-  }
-
-  const exObj = exercises.find(e => e.name === exName);
-  const isTimeBased = exObj.unit === 'minutes' || exObj.unit === 'seconds';
-  function updateSet(i, field, val) { const ns = sets.slice(); ns[i] = Object.assign({}, ns[i], {[field]: val}); setSets(ns); }
-  function addSetRow() { setSets(sets.concat([{reps:'', weight:''}])); }
-  function removeSetRow(i) { setSets(sets.filter((_,idx)=>idx!==i)); }
-  function addExerciseToPending() {
-    let totalValue = 0, detail = '';
-    if (isTimeBased) { totalValue = parseFloat(duration) || 0; detail = totalValue + ' ' + exObj.unit; }
-    else { totalValue = sets.reduce((s,st) => s + (parseFloat(st.reps)||0), 0); detail = sets.map(st => (st.reps||0)+(st.weight?'@'+st.weight+'lb':'')).join(', '); }
-    if (totalValue <= 0) return;
-    setPending(pending.concat([{ exercise: exName, variant: variant, muscleGroup: exObj.muscleGroup, unit: exObj.unit, isTimeBased: isTimeBased, sets: isTimeBased ? [] : sets.filter(s=>s.reps), totalValue: totalValue, detail: detail }]));
-    setSets([{reps:'',weight:''}]); setDuration('');
-  }
-  function removePending(i) { setPending(pending.filter((_,idx)=>idx!==i)); }
-
-  async function submitFreeformSession() {
-    if (pending.length === 0) return;
-    const entries = []; const now = Date.now(); const autoNotes = []; const prNotes = [];
-    pending.forEach((ex, i) => {
-      const priorBest = personalBest(activeOp.id, logs, ex.exercise);
-      if (priorBest !== null && ex.totalValue > priorBest) prNotes.push(ex.exercise+' — new personal best!');
-      const ts = now + i*2; const logId = 'log_'+ts;
-      entries.push({ id: logId, operatorId: activeOp.id, type:'protocol', date: todayStr(), timestamp: ts, protocolLabel: protocolLabel, exercise: ex.exercise, variant: ex.variant, category: ex.muscleGroup, unit: ex.unit, sets: ex.sets, totalValue: ex.totalValue, detail: ex.detail });
-      if (deployedCampaign) {
-        const loc = findLocationForCategory(deployedCampaign, ex.muscleGroup);
-        if (loc) {
-          const alreadyToday = logs.filter(l => l.type==='campaign' && l.campaignId===deployedCampaign.id && l.operatorId===activeOp.id && l.locationId===loc.id && l.date===todayStr()).concat(entries.filter(e2 => e2.type==='campaign' && e2.locationId===loc.id));
-          const isFirst = alreadyToday.length === 0;
-          entries.push({ id: logId+'_auto', operatorId: activeOp.id, type:'campaign', campaignId: deployedCampaign.id, locationId: loc.id, amount: ex.totalValue, date: todayStr(), timestamp: ts+1, source:'protocol-auto', sourceExercise: ex.exercise });
-          autoNotes.push(ex.exercise+' ('+ex.totalValue+' '+ex.unit+') auto-credited to '+loc.name+(isFirst?'':' at half value (soft cap)'));
-        }
-      }
-    });
-    await addLogs(entries);
-    let text = 'Session logged, '+activeOp.callsign+'. '+pending.length+' exercise(s) recorded.';
-    if (prNotes.length) text += ' ' + prNotes.join(' ');
-    text += autoNotes.length ? ' ' + autoNotes.join('. ') + '.' : (deployedCampaign ? ' No matching Location.' : ' Not currently deployed \u2014 no Campaign credit applied.');
-    setFeedback({ win: true, text: text });
-    setPending([]);
-  }
-
-  function submitManualCampaign() {
-    if (!deployedCampaign) { setFeedback({cap:false, text:'Deploy to a Campaign first \u2014 see the Campaigns tab.'}); return; }
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { setFeedback({cap:false, text:'Enter a valid amount before submitting, Operator.'}); return; }
-    const locId = locationId || deployedCampaign.locations[0].id;
-    const now = Date.now();
-    const entry = { id:'log_'+now, operatorId: activeOp.id, type:'campaign', campaignId: deployedCampaign.id, locationId: locId, amount: amt, date: todayStr(), timestamp: now };
-    const todaysAtLoc = logs.filter(l => l.type==='campaign' && l.campaignId===deployedCampaign.id && l.operatorId===activeOp.id && l.locationId===locId && l.date===todayStr());
-    addLogs([entry]);
-    if (todaysAtLoc.length >= 1) setFeedback({cap:true, text:"Contribution logged, Operator. Today's push is in \u2014 Command's got it. Anything more today still counts, just at half value. That's not a penalty. That's the mission reminding you recovery is part of it too. The Swarm doesn't stop. You're allowed to."});
-    else setFeedback({cap:false, text:'Contribution logged, Operator. Command sees it.'});
-    setAmount('');
-  }
-
-  const campLoc = deployedCampaign ? deployedCampaign.locations.find(l => l.id === (locationId||deployedCampaign.locations[0].id)) : null;
-
-  return (
-    <div className="panel">
-      <div className="bracket-label">Log Activity — {activeOp.callsign}</div>
-      <div className="field">
-        <label>Activity Type</label>
-        <div className="radio-group">
-          <div className={"radio-opt"+(mode==='structured'?' sel':'')} onClick={()=>{setMode('structured'); setFeedback(null);}}>Structured Session</div>
-          <div className={"radio-opt"+(mode==='freeform'?' sel':'')} onClick={()=>{setMode('freeform'); setFeedback(null);}}>Freeform Exercise</div>
-          <div className={"radio-opt"+(mode==='campaign'?' sel':'')} onClick={()=>{setMode('campaign'); setFeedback(null);}}>Campaign Contribution (manual)</div>
-        </div>
-      </div>
-
-      {mode === 'structured' && (
-        <div>
-          <div className="field">
-            <label>Session</label>
-            <select style={{width:'100%'}} value={sessionId} onChange={e=>{setSessionId(e.target.value); setObjSets({}); setObjVariant({});}}>
-              <optgroup label="Built-In Protocols">
-                {builtInSessions.filter(s=>!s.requiresSpecialization).map(s => <option key={s.id} value={s.id}>{s.protocol} — {s.name}</option>)}
-              </optgroup>
-              {builtInSessions.some(s=>s.requiresSpecialization) && (
-                <optgroup label={"Specialty Sessions — "+activeOp.specialization}>
-                  {builtInSessions.filter(s=>s.requiresSpecialization).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </optgroup>
-              )}
-              {(activeOp.customProtocols||[]).length > 0 && (
-                <optgroup label="My Custom Protocols">
-                  {activeOp.customProtocols.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </optgroup>
-              )}
-            </select>
-          </div>
-          {session.briefing && <div className="info-note" style={{marginBottom:14}}><strong>Mission Briefing:</strong> {session.briefing}</div>}
-          {session.objectives.map((obj, idx) => {
-            const isTB = obj.unit === 'seconds' || obj.unit === 'minutes';
-            const rows = getObjSets(idx, obj);
-            return (
-              <div key={idx} style={{border:'1px solid var(--border)', borderRadius:2, padding:12, marginBottom:10}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                  <div><strong>{obj.name}</strong> <span className="dim" style={{fontSize:11}}>— {obj.sets}×{obj.repLow===obj.repHigh?obj.repLow:obj.repLow+'–'+obj.repHigh} {obj.unit}</span></div>
-                  <select value={objVariant[idx]||obj.name} onChange={e=>setObjVariant(Object.assign({},objVariant,{[idx]:e.target.value}))} style={{fontSize:11}}>
-                    <option value={obj.name}>{obj.name} (standard)</option>
-                    {(obj.alternatives||[]).map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                {rows.map((r,si) => (
-                  <div className="set-row" key={si}>
-                    <span>{si+1}</span>
-                    <input type="number" placeholder={isTB?obj.unit:'Reps'} value={r.reps} onChange={e=>updateObjSet(idx,si,'reps',e.target.value)} />
-                    {!isTB && <input type="number" placeholder="Weight (lb)" value={r.weight} onChange={e=>updateObjSet(idx,si,'weight',e.target.value)} />}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-          {session.conditioningOptions && session.conditioningOptions.length > 0 && (
-            <div className="info-note" style={{marginBottom:14}}>
-              <strong>Field Conditioning (choose one, log separately if performed):</strong>
-              <ul style={{marginTop:6,paddingLeft:18}}>{session.conditioningOptions.map((c,i) => <li key={i}>{c}</li>)}</ul>
-            </div>
-          )}
-          {session.trainingNote && <div style={{fontSize:11,color:'var(--text-dim)',fontStyle:'italic',marginBottom:14}}>"{session.trainingNote}"</div>}
-          <button className="primary" style={{width:'100%'}} onClick={submitStructuredSession}>Submit Session AAR</button>
-        </div>
-      )}
-
-      {mode === 'freeform' && (
-        <div>
-          <div className="field">
-            <label>Protocol</label>
-            <select style={{width:'100%'}} value={protocolLabel} onChange={e=>setProtocolLabel(e.target.value)}>
-              <option>Protocol Alpha</option><option>Protocol Bravo</option><option>Protocol Charlie</option>
-            </select>
-          </div>
-          <div style={{border:'1px solid var(--border)', borderRadius:2, padding:14, marginBottom:14}}>
-            <div className="field">
-              <label>Exercise</label>
-              <select style={{width:'100%'}} value={exName} onChange={e=>{setExName(e.target.value); setVariant(e.target.value);}}>
-                {exercises.map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label>Variant / Substitution</label>
-              <select style={{width:'100%'}} value={variant} onChange={e=>setVariant(e.target.value)}>
-                <option value={exObj.name}>{exObj.name} (standard)</option>
-                {exObj.alternatives.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            {isTimeBased ? (
-              <div className="field"><label>Duration ({exObj.unit})</label><input type="number" value={duration} onChange={e=>setDuration(e.target.value)} /></div>
-            ) : (
-              <div className="field">
-                <label>Sets</label>
-                {sets.map((s,i) => (
-                  <div className="set-row" key={i}>
-                    <span>{i+1}</span>
-                    <input type="number" placeholder="Reps" value={s.reps} onChange={e=>updateSet(i,'reps',e.target.value)} />
-                    <input type="number" placeholder="Weight (lb)" value={s.weight} onChange={e=>updateSet(i,'weight',e.target.value)} />
-                    {sets.length>1 && <button className="small ghost" onClick={()=>removeSetRow(i)}>✕</button>}
-                  </div>
-                ))}
-                <button className="small ghost" onClick={addSetRow} style={{marginTop:6}}>+ Add Set</button>
-              </div>
-            )}
-            <button className="primary" onClick={addExerciseToPending} style={{marginTop:6}}>Add Exercise to Session</button>
-          </div>
-          {pending.length > 0 && (
-            <div style={{marginBottom:16}}>
-              <label>Pending Session ({pending.length})</label>
-              {pending.map((ex,i) => (
-                <div className="exercise-pending" key={i}>
-                  <div><strong>{ex.variant}</strong> — {ex.detail}</div>
-                  <button className="small ghost" onClick={()=>removePending(i)}>Remove</button>
-                </div>
-              ))}
-              <button className="primary" onClick={submitFreeformSession} style={{marginTop:8,width:'100%'}}>Submit Session AAR</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {mode === 'campaign' && (
-        <div>
-          {!deployedCampaign && <div className="info-note">Not currently deployed. Visit the Campaigns tab first.</div>}
-          {deployedCampaign && (
-            <div>
-              <div className="field">
-                <label>Location — {deployedCampaign.name}</label>
-                <div className="loc-pick">
-                  {deployedCampaign.locations.map(l => (
-                    <div key={l.id} className={"loc-opt"+((locationId||deployedCampaign.locations[0].id)===l.id?' sel':'')} onClick={()=>setLocationId(l.id)}>
-                      <div className="loc-opt-name">{l.name}</div><div className="loc-opt-obj">{l.objective}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="field"><label>Amount ({campLoc?campLoc.unit:''})</label><input type="number" value={amount} onChange={e=>setAmount(e.target.value)} /></div>
-              <button className="primary" onClick={submitManualCampaign}>Submit to Command</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {feedback && <div className={"feedback"+(feedback.cap?' cap':'')+(feedback.win?' win':'')}>{feedback.text}</div>}
-    </div>
-  );
-}
-
-function Dossier({ op, operators, campaigns, logs, squads, onUpdateOperator }) {
-  const [pickingSpec, setPickingSpec] = useState(false);
-  const [retesting, setRetesting] = useState(false);
-  if (!op) return null;
-  const orsData = computeORS(op.id, op, logs);
-  const status = computeReadinessStatus(op.id, logs);
-  const deployedCampaign = op.currentDeploymentId ? campaigns.find(c => c.id === op.currentDeploymentId) : null;
-  const rank = computeRank(orsData.ors, op.id, logs, campaigns, status);
-  const mcp = computeMCP(op.id, campaigns, logs);
-  const nri = nextRankInfo(rank, orsData.ors, op.id, logs, campaigns, status);
-  const specUnlocked = RANK_ORDER.indexOf(rank) >= RANK_ORDER.indexOf('Operator');
-  const daysSinceBaseline = op.baseline ? daysBetween(op.baseline.date, todayStr()) : null;
-  const completedCampaigns = campaigns.filter(c => c.resolved==='success' && logs.some(l=>l.operatorId===op.id && l.type==='campaign' && l.campaignId===c.id));
-  const activeHabitCount = (op.habits||[]).filter(h=>h.active).length;
-
-  function chooseSpecialization(s) { if (onUpdateOperator) onUpdateOperator(Object.assign({}, op, {specialization: s})); setPickingSpec(false); }
-  function submitRetest(newBaseline) { onUpdateOperator(Object.assign({}, op, { previousBaseline: op.baseline, baseline: newBaseline })); setRetesting(false); }
-
-  return (
-    <div className="panel">
-      <div className="dossier-header">
-        <div style={{display:'flex',gap:16,alignItems:'center'}}>
-          <div className="dossier-avatar" style={{background:op.avatarColor}}>{op.callsign.charAt(0)}</div>
-          <div><div className="disp" style={{fontSize:24}}>{op.callsign}</div><div className="dim mono" style={{fontSize:11}}>{op.idNum} · Enlisted {op.joinDate}</div></div>
-        </div>
-        <span className={nri && nri.eligible ? "pill eligible" : "pill not-eligible"}>{nri ? (nri.eligible ? 'Promotion Eligible' : 'Not Eligible') : 'Max Rank'}</span>
-      </div>
-
-      <div className="grid2">
-        <div>
-          <div style={{marginBottom:18}}>
-            <div className="field-label" style={{marginBottom:4}}># ORS</div>
-            <div className="disp" style={{fontSize:26}}>{orsData.ors}</div>
-            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:orsData.ors+'%'}}></div></div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <div className="field-label" style={{marginBottom:4}}># Physical Capability</div>
-            <div className="disp" style={{fontSize:20}}>{orsData.physical}</div>
-            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:orsData.physical+'%'}}></div></div>
-            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:4,lineHeight:1.6}}>
-              Blend of: Protocol Completion (always active)
-              {orsData.overload ? `, Progressive Overload (${orsData.overload.avgChange>0?'+':''}${orsData.overload.avgChange}% avg across ${orsData.overload.exerciseCount} exercise${orsData.overload.exerciseCount===1?'':'s'})` : ', Progressive Overload (needs 60+ days of repeated exercise logs to activate)'}
-              {orsData.baselineImp ? `, Baseline Improvement (${orsData.baselineImp.avgChange>0?'+':''}${orsData.baselineImp.avgChange}%)` : ', Baseline Improvement (needs a retest to activate)'}.
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <div className="field-label" style={{marginBottom:4}}># Mission Discipline</div>
-            <div className="disp" style={{fontSize:20}}>{orsData.discipline}</div>
-            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:orsData.discipline+'%'}}></div></div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <div className="field-label" style={{marginBottom:4}}># Personal Development</div>
-            <div className="disp" style={{fontSize:20}}>{orsData.personalDev === null ? '—' : orsData.personalDev}</div>
-            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:(orsData.personalDev||0)+'%'}}></div></div>
-            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:4}}>{activeHabitCount>0 ? `${activeHabitCount} active habit(s) tracked` : 'No active habits'}</div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <div className="field-label" style={{marginBottom:4}}># Squad Contribution</div>
-            <div className="disp" style={{fontSize:20}}>{orsData.squad}</div>
-            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:orsData.squad+'%'}}></div></div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <div className="field-label" style={{marginBottom:4}}># Mission Contribution Points</div>
-            <div className="disp" style={{fontSize:20}}>{mcp}</div>
-          </div>
-        </div>
-
-        <div>
-          <div className="field-row"><span className="field-label">Status</span><span className={"status-pill "+status.cls}>{status.label}</span></div>
-          <div className="field-row"><span className="field-label">Name</span><span>{op.realName || '\u2014'}</span></div>
-          <div className="field-row"><span className="field-label">ID</span><span className="mono">{op.idNum}</span></div>
-          <div className="field-row"><span className="field-label">Join Date</span><span>{op.joinDate}</span></div>
-          <div className="field-row"><span className="field-label">Age Division</span><span className="pill">{op.ageDivision}</span></div>
-          <div className="field-row"><span className="field-label">Rank</span><span className="pill rank">{rank}</span></div>
-          <div className="field-row">
-            <span className="field-label">Specialization</span>
-            {!specUnlocked && <span className="pill dim">Unassigned — unlocks at Operator</span>}
-            {specUnlocked && op.specialization && <span className="pill">{op.specialization}</span>}
-            {specUnlocked && !op.specialization && !pickingSpec && <button className="small primary" onClick={()=>setPickingSpec(true)}>Choose Track</button>}
-            {specUnlocked && !op.specialization && pickingSpec && (
-              <select onChange={e=>chooseSpecialization(e.target.value)} defaultValue="">
-                <option value="" disabled>Select...</option>
-                {SPECIALIZATIONS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-              </select>
-            )}
-          </div>
-          <div className="field-row"><span className="field-label">Squad</span><span>{op.squadId ? ((squads.find(s=>s.id===op.squadId)||{}).name + (op.squadRole!=='member' ? ' ('+op.squadRole+')' : '')) : 'Unassigned (opt-in)'}</span></div>
-          <div className="field-row"><span className="field-label">Privacy Level</span><span className="pill">{op.privacy}</span></div>
-          <div className="field-row"><span className="field-label">Current Deployment</span><span>{deployedCampaign ? deployedCampaign.name : '\u2014'}</span></div>
-          <div className="field-row"><span className="field-label">Completed Campaigns</span><span>{completedCampaigns.length ? completedCampaigns.map(c=>c.name).join(', ') : 'None yet'}</span></div>
-          <div className="field-row"><span className="field-label">Reinforcement Drops</span><span>{op.reinforcementDropsAvailable} available</span></div>
-          <div className="field-row"><span className="field-label">Awards</span><span>None yet</span></div>
-        </div>
-      </div>
-
-      <div className="panel" style={{marginTop:0}}>
-        <div className="bracket-label">Rank Progress</div>
-        {nri ? (
-          <div>
-            <div style={{fontSize:13,marginBottom:10}}>Next rank: <span className="amber">{nri.next}</span></div>
-            <div className="stat-row"><span>ORS</span><span className="stat-val">{orsData.ors} / {nri.req.ors}</span></div>
-            <div className="stat-row"><span>Days Active (lifetime)</span><span className="stat-val">{nri.stats.daysActive} / {nri.req.daysActive}</span></div>
-            <div className="stat-row"><span>Campaigns Completed</span><span className="stat-val">{nri.stats.campaignsCompleted} / {nri.req.campaigns}</span></div>
-            <div className="stat-row"><span>Readiness Status</span><span className={status.label==='Active'?'amber':'threat'}>{status.label==='Active' ? 'Meets requirement' : 'Must be Active — currently '+status.label}</span></div>
-          </div>
-        ) : <div className="dim" style={{fontSize:12}}>Maximum rank achieved.</div>}
-      </div>
-
-      <div className="panel" style={{marginTop:0}}>
-        <div className="bracket-label">Baseline Record</div>
-        {op.baseline ? (
-          <div>
-            <div className="stat-row"><span>Last Test</span><span className="stat-val">{op.baseline.date} ({op.baseline.tier})</span></div>
-            <div className="stat-row"><span>Push-Ups / Pull-Ups / Squats / Plank</span><span className="stat-val">{op.baseline.pushups} / {op.baseline.pullups} / {op.baseline.squats} / {op.baseline.plankSeconds}s</span></div>
-            {op.previousBaseline && <div className="stat-row"><span>Previous Test</span><span className="stat-val">{op.previousBaseline.date}</span></div>}
-            {daysSinceBaseline !== null && daysSinceBaseline >= 56 && <div className="info-note" style={{borderLeft:'2px solid var(--amber)'}}>It's been {daysSinceBaseline} days since your last baseline — 8 weeks is the recommended retest cadence.</div>}
-          </div>
-        ) : <div className="dim" style={{fontSize:12}}>No baseline on record.</div>}
-        <button className="ghost small" onClick={()=>setRetesting(true)} style={{marginTop:12}}>Log Baseline Retest</button>
-      </div>
-
-      {retesting && <RetestModal onClose={()=>setRetesting(false)} onSubmit={submitRetest} />}
-    </div>
-  );
-}
-
-function RetestModal({ onClose, onSubmit }) {
-  const [pushups, setPushups] = useState('');
-  const [pullups, setPullups] = useState('');
-  const [squats, setSquats] = useState('');
-  const [plank, setPlank] = useState('');
-  const [runMinutes, setRunMinutes] = useState('');
-  function submit() {
-    const pu = parseFloat(pushups)||0, pl = parseFloat(pullups)||0, sq = parseFloat(squats)||0, pk = parseFloat(plank)||0;
-    let pts = 0;
-    pts += pu>=41?4:pu>=26?3:pu>=11?2:pu>=1?1:0;
-    pts += pl>=13?4:pl>=8?3:pl>=3?2:pl>=0?1:0;
-    pts += pk>=180?4:pk>=120?3:pk>=60?2:pk>0?1:0;
-    let tier = pts>=15?'Peak Tier':pts>=12?'Advanced Tier':pts>=8?'Development Tier':'Foundation Tier';
-    onSubmit({ pushups: pu, pullups: pl, squats: sq, plankSeconds: pk, runMinutes: parseFloat(runMinutes)||0, score: pts, tier: tier, date: todayStr() });
-  }
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="disp" style={{fontSize:18,marginBottom:16}}>Baseline Retest</div>
-        <div className="field"><label>Max Push-Ups</label><input type="number" value={pushups} onChange={e=>setPushups(e.target.value)} /></div>
-        <div className="field"><label>Max Pull-Ups</label><input type="number" value={pullups} onChange={e=>setPullups(e.target.value)} /></div>
-        <div className="field"><label>Bodyweight Squats in 2 Minutes</label><input type="number" value={squats} onChange={e=>setSquats(e.target.value)} /></div>
-        <div className="field"><label>Plank Hold (seconds)</label><input type="number" value={plank} onChange={e=>setPlank(e.target.value)} /></div>
-        <div className="field"><label>1.5 Mile Run Time (minutes, optional)</label><input type="number" value={runMinutes} onChange={e=>setRunMinutes(e.target.value)} /></div>
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-          <button className="ghost" onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={submit}>Submit Retest</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Roster({ operators, campaigns, logs, onView }) {
-  return (
-    <div className="panel">
-      <div className="bracket-label">Alpha Cell — Roster</div>
-      <table>
-        <thead><tr><th>Callsign</th><th>Rank</th><th>ORS</th><th>Status</th><th>Deployed To</th><th>Last Active</th></tr></thead>
-        <tbody>
-          {operators.map(op => {
-            const orsData = computeORS(op.id, op, logs);
-            const status = computeReadinessStatus(op.id, logs);
-            const deployedCampaign = op.currentDeploymentId ? campaigns.find(c=>c.id===op.currentDeploymentId) : null;
-            const rank = computeRank(orsData.ors, op.id, logs, campaigns, status);
-            const opLogs = logs.filter(l => l.operatorId===op.id);
-            const lastActive = opLogs.length ? opLogs.reduce((max,l)=>l.date>max?l.date:max, opLogs[0].date) : '\u2014';
-            return (
-              <tr key={op.id} className="clickable" onClick={()=>onView(op.id)}>
-                <td className="disp" style={{fontFamily:"'Oswald',sans-serif"}}>{op.callsign}</td>
-                <td>{rank}</td>
-                <td className="amber">{orsData.ors}</td>
-                <td><span className={"status-pill "+status.cls}>{status.label}</span></td>
-                <td>{deployedCampaign ? deployedCampaign.name : '\u2014'}</td>
-                <td>{lastActive}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function AARLog({ operators, campaigns, logs }) {
-  const sorted = logs.slice().sort((a,b) => b.timestamp - a.timestamp);
-  const opName = id => { const o = operators.find(o=>o.id===id); return o ? o.callsign : id; };
-  const locName = (campId, locId) => { const c = campaigns.find(c=>c.id===campId); if(!c) return locId; const l = c.locations.find(l=>l.id===locId); return l ? l.name : locId; };
-  const habitName = (op, habitId) => { const o = operators.find(o=>o.id===op); if(!o) return habitId; const h=(o.habits||[]).find(h=>h.id===habitId); return h?h.name:habitId; };
-  if (sorted.length === 0) return <div className="panel"><div className="empty"><div className="empty-title">No AARs filed yet.</div></div></div>;
-  return (
-    <div className="panel">
-      <div className="bracket-label">After Action Reports — Full Log</div>
-      <table>
-        <thead><tr><th>Date</th><th>Operator</th><th>Type</th><th>Detail</th><th>Value</th></tr></thead>
-        <tbody>
-          {sorted.map(l => (
-            <tr key={l.id}>
-              <td>{l.date}</td>
-              <td>{opName(l.operatorId)}</td>
-              <td>{l.type === 'protocol' ? 'Protocol' : l.type === 'habit' ? 'Habit' : (l.source==='protocol-auto' ? 'Campaign (auto)' : 'Campaign')}</td>
-              <td>{l.type === 'protocol' ? (l.variant+' — '+l.detail) : l.type === 'habit' ? habitName(l.operatorId, l.habitId) : (locName(l.campaignId, l.locationId) + (l.sourceExercise ? (' (from '+l.sourceExercise+')') : ''))}</td>
-              <td>{l.type === 'protocol' ? (l.totalValue+' '+l.unit) : l.type === 'habit' ? '✓' : l.amount}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Comms({ chat, operators, squads, activeOp, onSend }) {
-  const mySquad = activeOp.squadId ? squads.find(s=>s.id===activeOp.squadId) : null;
-  const [channel, setChannel] = useState('main');
-  const [text, setText] = useState('');
-  const scrollRef = useRef(null);
-
-  const shown = chat.filter(m => {
-    if (channel === 'main') return m.channel === 'main' || m.channel === 'command';
-    if (channel === 'squad') return (m.channel === 'squad' && m.squadId === (mySquad&&mySquad.id)) || m.channel === 'command';
-    if (channel === 'command') return m.channel === 'command';
-    return false;
-  });
-
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [shown.length]);
-
-  const canPost = channel === 'main' || (channel === 'squad' && mySquad) || (channel === 'command' && activeOp.isAdmin);
-
-  function send() {
-    if (!text.trim() || !canPost) return;
-    const msg = { id:'chat_'+Date.now(), authorId: activeOp.id, authorName: activeOp.callsign, text: text.trim(), timestamp: Date.now(), channel: channel };
-    if (channel === 'command') msg.isCommand = true;
-    else msg.isCommand = false;
-    if (channel === 'squad') msg.squadId = mySquad.id;
-    onSend(msg);
-    setText('');
-  }
-
-  return (
-    <div className="panel">
-      <div className="bracket-label">Comms</div>
-      <div className="radio-group" style={{marginBottom:16}}>
-        <div className={"radio-opt"+(channel==='main'?' sel':'')} onClick={()=>setChannel('main')}>Main</div>
-        <div className={"radio-opt"+(channel==='squad'?' sel':'')} onClick={()=>setChannel('squad')}>{mySquad ? mySquad.name : 'Squad (join one to unlock)'}</div>
-        <div className={"radio-opt"+(channel==='command'?' sel':'')} onClick={()=>setChannel('command')}>Command</div>
-      </div>
-
-      <div className="chat-scroll" ref={scrollRef}>
-        {shown.length === 0 && <div className="empty"><div className="empty-title">No transmissions yet.</div></div>}
-        {shown.map(m => (
-          <div key={m.id} className={"chat-msg "+(m.isCommand?'command':(m.authorId===activeOp.id?'mine':'theirs'))}>
-            <div className="chat-meta">{m.isCommand ? 'COMMAND TRANSMISSION' : m.authorName} · {new Date(m.timestamp).toLocaleString()}</div>
-            <div>{m.text}</div>
-          </div>
-        ))}
-      </div>
-
-      {canPost ? (
-        <div className="chat-input-row">
-          <input type="text" value={text} onChange={e=>setText(e.target.value)} placeholder={channel==='command'?'Post a Command transmission...':'Message...'} onKeyDown={e=>{if(e.key==='Enter') send();}} />
-          <button className="primary" onClick={send}>Send</button>
-        </div>
-      ) : (
-        <div className="info-note">{channel==='squad' ? 'Join a Squad to post here.' : 'Only Command (admins) can post in this channel.'}</div>
-      )}
-      <div className="info-note">Live — new messages arrive instantly via realtime, no refresh needed. Command messages also appear in Main and every Squad channel.</div>
-    </div>
-  );
-}
-
-function AdminPanel({ operators, campaigns, onUpdateOperators, onUpdateCampaigns, exercises, protocolSessions, onSaveExercise, onDeleteExercise, onSaveProtocolSession, onDeleteProtocolSession }) {
-  const [editingId, setEditingId] = useState(campaigns[0] ? campaigns[0].id : null);
-  const [savedMsg, setSavedMsg] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
-  const [draft, setDraft] = useState(null);
-  useEffect(() => { const c = campaigns.find(c=>c.id===editingId); setDraft(c ? JSON.parse(JSON.stringify(c)) : null); }, [editingId]);
-
-  const [exEditing, setExEditing] = useState(null);
-  const [exDraft, setExDraft] = useState(null);
-  const [exConfirmDelete, setExConfirmDelete] = useState(null);
-  const MUSCLE_GROUP_OPTIONS = ['Chest','Back','Shoulders','Biceps','Triceps','Quadriceps','Hamstrings','Glutes','Calves','Core','Grip','Cardio'];
-
-  const [sessEditing, setSessEditing] = useState(null);
-  const [sessDraft, setSessDraft] = useState(null);
-  const [sessConfirmDelete, setSessConfirmDelete] = useState(null);
-
-  function updateLocField(idx, field, val) {
-    const locs = draft.locations.slice();
-    locs[idx] = Object.assign({}, locs[idx], { [field]: field==='manualTarget' ? (val?Number(val):null) : val });
-    setDraft(Object.assign({}, draft, {locations: locs}));
-  }
-  function addLocation() { setDraft(Object.assign({}, draft, {locations: draft.locations.concat([{ id: 'loc_'+Date.now(), name: 'New Location', objective: 'Total reps', category: 'Chest', unit: 'reps', manualTarget: null }])})); }
-  function removeLocation(idx) { setDraft(Object.assign({}, draft, {locations: draft.locations.filter((_,i)=>i!==idx)})); }
-  async function saveCampaign() {
-    const exists = campaigns.some(c=>c.id===draft.id);
-    const newCamps = exists ? campaigns.map(c => c.id === draft.id ? draft : c) : campaigns.concat([draft]);
-    await onUpdateCampaigns(newCamps);
-    setEditingId(draft.id);
-    setSavedMsg('Saved.'); setTimeout(()=>setSavedMsg(''), 2000);
-  }
-  async function forceLockWindow() {
-    const count = Math.max(1, draft.deployedOperatorIds.length);
-    const targets = {}; draft.locations.forEach(loc => { targets[loc.id] = locationTarget(draft, loc); });
-    const updated = Object.assign({}, draft, {lockedAt: todayStr(), lockedTargets: targets, lockedDeployedCount: count});
-    setDraft(updated);
-    await onUpdateCampaigns(campaigns.map(c => c.id === updated.id ? updated : c));
-  }
-  async function forceResolve(result) {
-    const updated = Object.assign({}, draft, {resolved: result});
-    setDraft(updated);
-    const clearedOps = operators.map(o => o.currentDeploymentId === updated.id ? Object.assign({}, o, {currentDeploymentId:null}) : o);
-    await onUpdateOperators(clearedOps);
-    await onUpdateCampaigns(campaigns.map(c => c.id === updated.id ? updated : c));
-  }
-  function updateOpField(id, field, val) {
-    const parsedVal = field==='weeklyTarget' ? Number(val) : val;
-    const patch = { [field]: parsedVal };
-    const target = operators.find(o=>o.id===id);
-    // Admin/Moderator status confers a title automatically — Command and Engineer
-    // are never manually chosen. Admin always takes precedence if both are set.
-    if (field === 'isAdmin') {
-      patch.specialization = parsedVal ? CONFERRED_TITLES.admin : ((target && target.isModerator) ? CONFERRED_TITLES.moderator : null);
-    }
-    if (field === 'isModerator' && !(target && target.isAdmin)) {
-      patch.specialization = parsedVal ? CONFERRED_TITLES.moderator : null;
-    }
-    onUpdateOperators(operators.map(o => o.id === id ? Object.assign({}, o, patch) : o));
-  }
-  function deleteOperator(id) { onUpdateOperators(operators.filter(o => o.id !== id)); setConfirmDelete(null); }
-
-  return (
-    <div>
-      <div className="panel">
-        <div className="bracket-label">Admin — Campaigns</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
-          {campaigns.map(c => <button key={c.id} className={editingId===c.id?'primary small':'ghost small'} onClick={()=>setEditingId(c.id)}>{c.name}</button>)}
-          <button className="ghost small" onClick={()=>{const id='camp_'+Date.now(); setEditingId(null); setDraft({id:id, name:'New Campaign', threat:'Unknown', sector:'Unassigned Sector', startDate: todayStr(), joinWindowDays:5, durationDays:28, locations:[], lockedAt:null, lockedTargets:null, lockedDeployedCount:0, deployedOperatorIds:[], reinforcementsUsed:0, resolved:null, lore:''});}}>+ New Campaign</button>
-        </div>
-        {draft && (
-          <div>
-            <div className="field"><label>Campaign Name</label><input type="text" value={draft.name} onChange={e=>setDraft(Object.assign({},draft,{name:e.target.value}))} /></div>
-            <div className="grid2">
-              <div className="field"><label>Threat / Faction</label><input type="text" value={draft.threat} onChange={e=>setDraft(Object.assign({},draft,{threat:e.target.value}))} /></div>
-              <div className="field"><label>Sector</label><input type="text" value={draft.sector} onChange={e=>setDraft(Object.assign({},draft,{sector:e.target.value}))} /></div>
-            </div>
-            <div className="grid2">
-              <div className="field"><label>Join Window (days)</label><input type="number" value={draft.joinWindowDays} onChange={e=>setDraft(Object.assign({},draft,{joinWindowDays:Number(e.target.value)}))} /></div>
-              <div className="field"><label>Duration (days)</label><input type="number" value={draft.durationDays} onChange={e=>setDraft(Object.assign({},draft,{durationDays:Number(e.target.value)}))} /></div>
-            </div>
-            <div className="field"><label>Full Lore Briefing (optional — shown as an expandable "Full Briefing" to deployed operators)</label>
-              <textarea value={draft.lore||''} onChange={e=>setDraft(Object.assign({},draft,{lore:e.target.value}))} rows="8" style={{width:'100%'}} placeholder="Write the deeper story behind this Campaign — why this world matters, what's at stake, who's already been lost..." />
-            </div>
-            <label style={{marginTop:8}}>Locations</label>
-            {draft.locations.map((loc, idx) => (
-              <div key={loc.id} style={{border:'1px solid var(--border)',borderRadius:2,padding:12,marginBottom:10}}>
-                <div className="grid2">
-                  <div className="field"><label>Location Name</label><input type="text" value={loc.name} onChange={e=>updateLocField(idx,'name',e.target.value)} /></div>
-                  <div className="field"><label>Objective Description</label><input type="text" value={loc.objective} onChange={e=>updateLocField(idx,'objective',e.target.value)} /></div>
-                </div>
-                <div className="grid2">
-                  <div className="field"><label>Category</label>
-                    <select style={{width:'100%'}} value={loc.category} onChange={e=>updateLocField(idx,'category',e.target.value)}>{LOCATION_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                  </div>
-                  <div className="field"><label>Unit</label><input type="text" value={loc.unit} onChange={e=>updateLocField(idx,'unit',e.target.value)} /></div>
-                </div>
-                <div className="field"><label>Manual Target Override (blank = auto-calculated)</label><input type="number" value={loc.manualTarget||''} onChange={e=>updateLocField(idx,'manualTarget',e.target.value)} /></div>
-                <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:8}}>Current computed target: {locationTarget(draft, loc)} {loc.unit}</div>
-                <button className="small danger" onClick={()=>removeLocation(idx)}>Remove Location</button>
-              </div>
-            ))}
-            <button className="ghost small" onClick={addLocation} style={{marginBottom:14}}>+ Add Location</button>
-            <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-              <button className="primary" onClick={saveCampaign}>Save Campaign</button>
-              {!draft.lockedAt && <button className="ghost" onClick={forceLockWindow}>Force Lock Join Window Now</button>}
-              {draft.lockedAt && !draft.resolved && <button className="ghost" onClick={()=>forceResolve('success')}>Force Resolve: Success</button>}
-              {draft.lockedAt && !draft.resolved && <button className="danger" onClick={()=>forceResolve('failed')}>Force Resolve: Failed</button>}
-              {savedMsg && <span style={{color:'var(--success)',fontSize:12}}>{savedMsg}</span>}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="panel">
-        <div className="bracket-label">Admin — Exercise Library ({exercises.length})</div>
-        <div style={{maxHeight:300,overflowY:'auto',marginBottom:14}}>
-          {exercises.map(ex => (
-            <div key={ex.id} className="field-row">
-              <span>{ex.name} <span className="dim mono" style={{fontSize:10}}>({ex.muscleGroup} · {ex.unit})</span></span>
-              <span style={{display:'flex',gap:6}}>
-                <button className="small ghost" onClick={()=>{setExEditing(ex.id); setExDraft(Object.assign({},ex,{altText:(ex.alternatives||[]).join(', ')}));}}>Edit</button>
-                {exConfirmDelete===ex.id ? (
-                  <span style={{display:'flex',gap:4}}><button className="small danger" onClick={()=>{onDeleteExercise(ex.id); setExConfirmDelete(null);}}>Confirm</button><button className="small ghost" onClick={()=>setExConfirmDelete(null)}>Cancel</button></span>
-                ) : <button className="small ghost" onClick={()=>setExConfirmDelete(ex.id)}>Delete</button>}
-              </span>
-            </div>
-          ))}
-        </div>
-        {exDraft ? (
-          <div style={{border:'1px solid var(--border)',borderRadius:2,padding:12}}>
-            <div className="field"><label>Name</label><input type="text" value={exDraft.name} onChange={e=>setExDraft(Object.assign({},exDraft,{name:e.target.value}))} /></div>
-            <div className="grid2">
-              <div className="field"><label>Muscle Group</label>
-                <select style={{width:'100%'}} value={exDraft.muscleGroup} onChange={e=>setExDraft(Object.assign({},exDraft,{muscleGroup:e.target.value}))}>
-                  {MUSCLE_GROUP_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div className="field"><label>Unit</label>
-                <select style={{width:'100%'}} value={exDraft.unit} onChange={e=>setExDraft(Object.assign({},exDraft,{unit:e.target.value}))}>
-                  <option value="reps">reps</option><option value="seconds">seconds</option><option value="minutes">minutes</option>
-                </select>
-              </div>
-            </div>
-            <div className="field"><label>Alternatives (comma-separated)</label><input type="text" value={exDraft.altText||''} onChange={e=>setExDraft(Object.assign({},exDraft,{altText:e.target.value}))} /></div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="primary small" onClick={()=>{
-                const toSave = { id: exDraft.id, name: exDraft.name, muscleGroup: exDraft.muscleGroup, unit: exDraft.unit, alternatives: exDraft.altText.split(',').map(s=>s.trim()).filter(Boolean) };
-                onSaveExercise(toSave); setExDraft(null); setExEditing(null);
-              }}>Save</button>
-              <button className="ghost small" onClick={()=>{setExDraft(null); setExEditing(null);}}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <button className="ghost small" onClick={()=>setExDraft({id:undefined, name:'', muscleGroup:'Chest', unit:'reps', altText:''})}>+ Add Exercise</button>
-        )}
-      </div>
-
-      <div className="panel">
-        <div className="bracket-label">Admin — Protocol Session Library ({protocolSessions.length})</div>
-        <div style={{maxHeight:300,overflowY:'auto',marginBottom:14}}>
-          {protocolSessions.map(s => (
-            <div key={s.id} className="field-row">
-              <span>{s.protocol} — {s.name} <span className="dim mono" style={{fontSize:10}}>({s.objectives.length} exercises{s.requiresSpecialization?', '+s.requiresSpecialization:''})</span></span>
-              <span style={{display:'flex',gap:6}}>
-                <button className="small ghost" onClick={()=>{setSessEditing(s.id); setSessDraft(JSON.parse(JSON.stringify(s)));}}>Edit</button>
-                {sessConfirmDelete===s.id ? (
-                  <span style={{display:'flex',gap:4}}><button className="small danger" onClick={()=>{onDeleteProtocolSession(s.id); setSessConfirmDelete(null);}}>Confirm</button><button className="small ghost" onClick={()=>setSessConfirmDelete(null)}>Cancel</button></span>
-                ) : <button className="small ghost" onClick={()=>setSessConfirmDelete(s.id)}>Delete</button>}
-              </span>
-            </div>
-          ))}
-        </div>
-        {sessDraft ? (
-          <div style={{border:'1px solid var(--border)',borderRadius:2,padding:12}}>
-            <div className="grid2">
-              <div className="field"><label>Protocol Label</label><input type="text" value={sessDraft.protocol} onChange={e=>setSessDraft(Object.assign({},sessDraft,{protocol:e.target.value}))} /></div>
-              <div className="field"><label>Session Name</label><input type="text" value={sessDraft.name} onChange={e=>setSessDraft(Object.assign({},sessDraft,{name:e.target.value}))} /></div>
-            </div>
-            <div className="field"><label>Briefing</label><textarea value={sessDraft.briefing||''} onChange={e=>setSessDraft(Object.assign({},sessDraft,{briefing:e.target.value}))} rows="2" style={{width:'100%'}} /></div>
-            <div className="field"><label>Training Note</label><textarea value={sessDraft.trainingNote||''} onChange={e=>setSessDraft(Object.assign({},sessDraft,{trainingNote:e.target.value}))} rows="2" style={{width:'100%'}} /></div>
-            <div className="field"><label>Requires Specialization (blank = available to everyone)</label>
-              <input type="text" value={sessDraft.requiresSpecialization||''} onChange={e=>setSessDraft(Object.assign({},sessDraft,{requiresSpecialization:e.target.value||null}))} placeholder="e.g. Heavy Assault" />
-            </div>
-            <label>Objectives ({sessDraft.objectives.length})</label>
-            {sessDraft.objectives.map((o,i) => (
-              <div key={i} className="exercise-pending">
-                <div>{o.name} — {o.sets}×{o.repLow}-{o.repHigh} {o.unit} ({o.muscleGroup})</div>
-                <button className="small ghost" onClick={()=>setSessDraft(Object.assign({},sessDraft,{objectives:sessDraft.objectives.filter((_,idx)=>idx!==i)}))}>Remove</button>
-              </div>
-            ))}
-            {exercises.length > 0 && (
-              <div style={{display:'flex',gap:8,marginTop:8}}>
-                <select id="sessAddEx" style={{flex:1}} defaultValue={exercises[0].name}>
-                  {exercises.map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}
-                </select>
-                <button className="ghost small" onClick={()=>{
-                  const sel = document.getElementById('sessAddEx').value;
-                  const ex = exercises.find(e=>e.name===sel);
-                  setSessDraft(Object.assign({},sessDraft,{objectives: sessDraft.objectives.concat([{name:ex.name, muscleGroup:ex.muscleGroup, unit:ex.unit, sets:3, repLow:10, repHigh:12, alternatives:ex.alternatives}])}));
-                }}>+ Add Exercise</button>
-              </div>
-            )}
-            <div style={{display:'flex',gap:8,marginTop:14}}>
-              <button className="primary small" onClick={()=>{
-                const toSave = Object.assign({}, sessDraft, {id: sessDraft.id || ('custom_session_'+Date.now())});
-                onSaveProtocolSession(toSave); setSessDraft(null); setSessEditing(null);
-              }}>Save Session</button>
-              <button className="ghost small" onClick={()=>{setSessDraft(null); setSessEditing(null);}}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <button className="ghost small" onClick={()=>setSessDraft({id:undefined, protocol:'Protocol Alpha', name:'New Session', briefing:'', trainingNote:'', conditioningOptions:[], requiresSpecialization:null, objectives:[]})}>+ Add Protocol Session</button>
-        )}
-      </div>
-
-      <div className="panel">
-        <div className="bracket-label">Admin — Roster Management</div>
-        <div className="info-note" style={{marginBottom:12}}>Toggling Admin or Mod automatically sets the operator's title to Command or Engineer — these titles are conferred by role, not chosen. Admin takes precedence if both are checked.</div>
-        <table>
-          <thead><tr><th>Callsign</th><th>Weekly Target</th><th>Age Division</th><th>Admin</th><th>Mod</th><th>Title</th><th></th></tr></thead>
-          <tbody>
-            {operators.map(o => (
-              <tr key={o.id}>
-                <td className="disp" style={{fontFamily:"'Oswald',sans-serif"}}>{o.callsign}</td>
-                <td><input type="number" value={o.weeklyTarget} onChange={e=>updateOpField(o.id,'weeklyTarget',e.target.value)} style={{width:60}} /></td>
-                <td><select value={o.ageDivision} onChange={e=>updateOpField(o.id,'ageDivision',e.target.value)}>{AGE_DIVISIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></td>
-                <td><input type="checkbox" checked={!!o.isAdmin} onChange={e=>updateOpField(o.id,'isAdmin',e.target.checked)} /></td>
-                <td><input type="checkbox" checked={!!o.isModerator} onChange={e=>updateOpField(o.id,'isModerator',e.target.checked)} /></td>
-                <td className="dim" style={{fontSize:11}}>{o.isAdmin ? 'Command' : (o.isModerator ? 'Engineer' : '—')}</td>
-                <td>
-                  {confirmDelete===o.id ? (
-                    <span style={{display:'flex',gap:6}}><button className="small danger" onClick={()=>deleteOperator(o.id)}>Confirm</button><button className="small ghost" onClick={()=>setConfirmDelete(null)}>Cancel</button></span>
-                  ) : <button className="small ghost" onClick={()=>setConfirmDelete(o.id)}>Delete</button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-</script>
-</body>
-</html>
+              <span className={"status-tag "+(phase==='recruiting'?'recruiting':phase==='active'?'active':phase)
