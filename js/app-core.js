@@ -14,6 +14,7 @@ function App() {
   const [personalRecords, setPersonalRecords] = useState([]);
   const [raidTemplates, setRaidTemplates] = useState([]);
   const [raidInstances, setRaidInstances] = useState([]);
+  const [campaignPOIs, setCampaignPOIs] = useState([]);
   const [tab, setTab] = useState('command');
   const [showReset, setShowReset] = useState(false);
   const [viewDossierId, setViewDossierId] = useState(null);
@@ -27,11 +28,12 @@ function App() {
   }, []);
 
   async function refetchAll() {
-    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances } = await fetchAllData();
+    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs } = await fetchAllData();
     setOperators(ops); setCampaigns(camps); setLogs(lgs); setChat(ch); setCodexEntries(cx); setSquads(squads);
     setExercises(exercises); setProtocolSessions(protocolSessions); setQuips(quips);
     setAwards(awards); setPersonalRecords(personalRecords);
     setRaidTemplates(raidTemplates); setRaidInstances(raidInstances);
+    setCampaignPOIs(campaignPOIs);
   }
 
   useEffect(() => {
@@ -217,6 +219,16 @@ function App() {
     await sb.from('raid_templates').delete().eq('id', templateId);
     await refetchAll();
   }
+  async function savePOI(poi) {
+    const exists = campaignPOIs.some(p=>p.id===poi.id);
+    if (exists) await sb.from('campaign_pois').update({ name: poi.name, briefing: poi.briefing||null, row: poi.row, col: poi.col }).eq('id', poi.id);
+    else await sb.from('campaign_pois').insert({ campaign_id: poi.campaignId, name: poi.name, briefing: poi.briefing||null, row: poi.row, col: poi.col });
+    await refetchAll();
+  }
+  async function deletePOI(poiId) {
+    await sb.from('campaign_pois').delete().eq('id', poiId);
+    await refetchAll();
+  }
   async function resetAll() {
     await sb.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await sb.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -398,8 +410,8 @@ function App() {
           })}
         </div>
         <div className="main">
-          {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} quips={quips} />}
-          {tab==='campaigns' && <Campaigns campaigns={campaigns} activeOp={op} logs={logs} onDeploy={deployToCampaign} onUndeploy={undeploy} onClaimReinforcement={claimReinforcement} />}
+          {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} quips={quips} campaignPOIs={campaignPOIs} />}
+          {tab==='campaigns' && <Campaigns campaigns={campaigns} activeOp={op} logs={logs} onDeploy={deployToCampaign} onUndeploy={undeploy} onClaimReinforcement={claimReinforcement} campaignPOIs={campaignPOIs} />}
           {tab==='galaxy' && <GalaxyMap entries={codexEntries} campaigns={campaigns} logs={logs} onGoCampaigns={()=>setTab('campaigns')} />}
           {tab==='log' && <LogActivity deployedCampaign={deployedCampaignTop} activeOp={op} logs={logs} addLogs={addLogs} campaigns={campaigns} exercises={exercises} protocolSessions={protocolSessions} onRecordPR={recordPersonalRecord} raidTemplates={raidTemplates} raidInstances={raidInstances} />}
           {tab==='myprotocols' && <MyProtocols op={op} onSave={saveCustomProtocol} onDelete={deleteCustomProtocol} exercises={exercises} />}
@@ -417,7 +429,8 @@ function App() {
             exercises={exercises} protocolSessions={protocolSessions} onSaveExercise={saveExercise} onDeleteExercise={deleteExercise}
             onSaveProtocolSession={saveProtocolSession} onDeleteProtocolSession={deleteProtocolSession}
             quips={quips} onSaveQuip={saveQuip} onDeleteQuip={deleteQuip}
-            raidTemplates={raidTemplates} onSaveRaidTemplate={saveRaidTemplate} onDeleteRaidTemplate={deleteRaidTemplate} />}
+            raidTemplates={raidTemplates} onSaveRaidTemplate={saveRaidTemplate} onDeleteRaidTemplate={deleteRaidTemplate}
+            campaignPOIs={campaignPOIs} onSavePOI={savePOI} onDeletePOI={deletePOI} />}
         </div>
       </div>
 
