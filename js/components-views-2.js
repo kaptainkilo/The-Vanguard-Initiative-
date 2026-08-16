@@ -7,6 +7,7 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns, exe
   const activeRaidTemplate = activeRaidInstance ? raidTemplates.find(t => t.id === activeRaidInstance.raidTemplateId) : null;
 
   const [mode, setMode] = useState('structured');
+  const [selectedProtocolFilter, setSelectedProtocolFilter] = useState(combinedSessions[0] ? combinedSessions[0].protocol : '');
   const [sessionId, setSessionId] = useState(combinedSessions[0] ? combinedSessions[0].id : '');
   const [objSets, setObjSets] = useState({});
   const [objVariant, setObjVariant] = useState({});
@@ -185,23 +186,24 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns, exe
 
       {mode === 'structured' && (
         <div>
-          <div className="field">
-            <label>Session</label>
-            <select style={{width:'100%'}} value={sessionId} onChange={e=>{setSessionId(e.target.value); setObjSets({}); setObjVariant({});}}>
-              <optgroup label="Built-In Protocols">
-                {builtInSessions.filter(s=>!s.requiresSpecialization).map(s => <option key={s.id} value={s.id}>{s.protocol} — {s.name}</option>)}
-              </optgroup>
-              {builtInSessions.some(s=>s.requiresSpecialization) && (
-                <optgroup label={"Specialty Sessions — "+activeOp.specialization}>
-                  {builtInSessions.filter(s=>s.requiresSpecialization).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </optgroup>
-              )}
-              {(activeOp.customProtocols||[]).length > 0 && (
-                <optgroup label="My Custom Protocols">
-                  {activeOp.customProtocols.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </optgroup>
-              )}
-            </select>
+          <div className="grid2">
+            <div className="field">
+              <label>Protocol</label>
+              <select style={{width:'100%'}} value={selectedProtocolFilter} onChange={e=>{
+                const newProtocol = e.target.value;
+                setSelectedProtocolFilter(newProtocol);
+                const firstInProtocol = combinedSessions.find(s => s.protocol === newProtocol);
+                if (firstInProtocol) { setSessionId(firstInProtocol.id); setObjSets({}); setObjVariant({}); }
+              }}>
+                {Array.from(new Set(combinedSessions.map(s=>s.protocol))).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Workout</label>
+              <select style={{width:'100%'}} value={sessionId} onChange={e=>{setSessionId(e.target.value); setObjSets({}); setObjVariant({});}}>
+                {combinedSessions.filter(s => s.protocol === selectedProtocolFilter).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
           </div>
           {session.briefing && <div className="info-note" style={{marginBottom:14}}><strong>Mission Briefing:</strong> {session.briefing}</div>}
           {session.objectives.map((obj, idx) => {
@@ -432,8 +434,7 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
           <div className="field-row"><span className="field-label">ID</span><span className="mono">{op.idNum}</span></div>
           <div className="field-row"><span className="field-label">Join Date</span><span>{op.joinDate}</span></div>
           <div className="field-row"><span className="field-label">Age Division</span><span className="pill">{op.ageDivision}</span></div>
-          <div className="field-row"><span className="field-label">Rank</span><span className="pill rank">{rankDisplay(rank, rankTier)}</span></div>
-          {commandRank && <div className="field-row"><span className="field-label">Command Rank</span><span className="pill rank">{commandRankDisplay(commandRank)}</span></div>}
+          <div className="field-row"><span className="field-label">Rank</span><span className="pill rank">{commandRank ? commandRankDisplay(commandRank) : rankDisplay(rank, rankTier)}</span></div>
           <div className="field-row">
             <span className="field-label">Specialization</span>
             {!specUnlocked && <span className="pill dim">Unassigned — unlocks at Operator</span>}
@@ -576,7 +577,7 @@ function Roster({ operators, campaigns, logs, onView }) {
     <div className="panel">
       <div className="bracket-label">Alpha Cell — Roster</div>
       <table>
-        <thead><tr><th>Callsign</th><th>Rank</th><th>Command Rank</th><th>ORS</th><th>Status</th><th>Deployed To</th><th>Last Active</th></tr></thead>
+        <thead><tr><th>Callsign</th><th>Rank</th><th>ORS</th><th>Status</th><th>Deployed To</th><th>Last Active</th></tr></thead>
         <tbody>
           {operators.map(op => {
             const orsData = computeORS(op.id, op, logs);
@@ -590,8 +591,7 @@ function Roster({ operators, campaigns, logs, onView }) {
             return (
               <tr key={op.id} className="clickable" onClick={()=>onView(op.id)}>
                 <td className="disp" style={{fontFamily:"'Oswald',sans-serif"}}>{op.callsign}</td>
-                <td>{rankDisplay(rank, rankTier)}</td>
-                <td className="dim">{commandRankDisplay(commandRank) || '\u2014'}</td>
+                <td>{commandRank ? commandRankDisplay(commandRank) : rankDisplay(rank, rankTier)}</td>
                 <td className="amber">{orsData.ors}</td>
                 <td><span className={"status-pill "+status.cls}>{status.label}</span></td>
                 <td>{deployedCampaign ? deployedCampaign.name : '\u2014'}</td>
