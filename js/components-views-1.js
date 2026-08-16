@@ -3,7 +3,7 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
   const status = computeReadinessStatus(activeOp.id, logs);
   const rank = computeRank(orsData.ors, activeOp.id, logs, campaigns, status);
   const rankTier = computeRankTier(rank, orsData.ors, activeOp.id, logs, campaigns);
-  const commandRank = computeCommandRank(activeOp);
+  const commandRank = computeCommandRank(activeOp, orsData.ors, activeOp.id, logs, campaigns, status);
   const locProgress = deployedCampaign ? computeLocationProgress(deployedCampaign, logs) : [];
   const planetPct = deployedCampaign ? computePlanetControl(locProgress) : 0;
   const daysLeft = deployedCampaign ? Math.max(0, deployedCampaign.durationDays - daysBetween(deployedCampaign.startDate, todayStr())) : 0;
@@ -695,4 +695,3 @@ function personalBest(operatorId, logs, exerciseName) {
   if (prior.length === 0) return null;
   return Math.max.apply(null, prior.map(l=>l.totalValue));
 }
-
