@@ -174,6 +174,18 @@ function App() {
       }
     }
   }
+  async function checkServiceStripAward(op, logsSnapshot, campaignsSnapshot, existingAwards) {
+    // Service Strips: one per full year of accumulated (non-consecutive) Days
+    // Active — the same lifetime daysActive count the Operator rank system uses.
+    const stats = operatorRankStats(op.id, logsSnapshot, campaignsSnapshot);
+    const yearsServed = Math.floor(stats.daysActive / 365);
+    for (let y = 1; y <= yearsServed; y++) {
+      const type = 'service_strip_'+y;
+      if (!existingAwards.some(a=>a.operatorId===op.id && a.awardType===type)) {
+        await sb.from('awards').insert({ operator_id: op.id, award_type: type, title: y+'-Year Service Strip', description: y*365+' accumulated active days logged. Earned, not given.' });
+      }
+    }
+  }
   async function launchRaid(squad, template) {
     const alreadyActive = raidInstances.some(r => r.squadId === squad.id && r.status === 'active');
     if (alreadyActive) return false;
@@ -321,6 +333,7 @@ function App() {
   useEffect(() => {
     if (!loaded || !opOnboarded || !op) return;
     checkStreakAward(op, logs, awards);
+    checkServiceStripAward(op, logs, campaigns, awards);
   }, [streakTop, loaded, opOnboarded]);
 
   useEffect(() => {
@@ -400,7 +413,7 @@ function App() {
           {tab==='codex' && <Codex entries={codexEntries} isAdmin={op.isAdmin} onUpdate={updateCodex} />}
           {tab==='comms' && <Comms chat={chat} operators={operators} squads={squads} activeOp={op} onSend={sendChat} />}
           {tab==='aar' && <AARLog operators={operators} campaigns={campaigns} logs={logs} />}
-          {tab==='admin' && op.isAdmin && <AdminPanel operators={operators} campaigns={campaigns} onUpdateOperators={updateOperators} onUpdateCampaigns={updateCampaigns}
+          {tab==='admin' && op.isAdmin && <AdminPanel operators={operators} campaigns={campaigns} logs={logs} onUpdateOperators={updateOperators} onUpdateCampaigns={updateCampaigns}
             exercises={exercises} protocolSessions={protocolSessions} onSaveExercise={saveExercise} onDeleteExercise={deleteExercise}
             onSaveProtocolSession={saveProtocolSession} onDeleteProtocolSession={deleteProtocolSession}
             quips={quips} onSaveQuip={saveQuip} onDeleteQuip={deleteQuip}
@@ -436,4 +449,3 @@ function App() {
     </div>
   );
 }
-
