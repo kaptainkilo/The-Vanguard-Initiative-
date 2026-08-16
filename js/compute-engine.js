@@ -323,19 +323,18 @@ function nextRankInfo(currentRank, currentTier, ors, operatorId, logs, campaigns
 // Parallel Command track — completely independent of the Operator rank above.
 // Driven by continuous tenure-in-role (days since admin_since/moderator_since),
 // not ORS. Admin takes precedence over Moderator if an operator somehow has both.
-function computeCommandRank(operator) {
-  let track, sinceDate, ranks;
-  if (operator.isAdmin && operator.adminSince) { track = 'Command Staff'; sinceDate = operator.adminSince; ranks = COMMAND_RANKS; }
-  else if (operator.isModerator && operator.moderatorSince) { track = 'Jr Command Staff'; sinceDate = operator.moderatorSince; ranks = JR_COMMAND_RANKS; }
-  else return null;
-  const tenureDays = daysBetween(sinceDate, todayStr());
-  for (let r = ranks.length - 1; r >= 0; r--) {
-    const tiers = COMMAND_TENURE_TIERS[r];
-    for (let t = 2; t >= 0; t--) {
-      if (tenureDays >= tiers[t]) return { track: track, rank: ranks[r], tier: t+1, tenureDays: tenureDays };
-    }
-  }
-  return { track: track, rank: ranks[0], tier: 1, tenureDays: tenureDays };
+function computeCommandRank(operator, ors, operatorId, logs, campaigns, status) {
+  if (!operator.isAdmin && !operator.isModerator) return null;
+  const track = operator.isAdmin ? 'Command Staff' : 'Jr Command Staff';
+  const ranks = operator.isAdmin ? COMMAND_RANKS : JR_COMMAND_RANKS;
+  // Deliberately reuses computeRank/computeRankTier directly — same ORS/Days
+  // Active/Campaigns thresholds, same Active-status gate, same everything.
+  // The Command rank is just the Operator rank's tier index relabeled with
+  // NCO/Officer names, so the two tracks can never drift out of sync.
+  const operatorRank = computeRank(ors, operatorId, logs, campaigns, status);
+  const operatorTier = computeRankTier(operatorRank, ors, operatorId, logs, campaigns);
+  const idx = EARNABLE_RANK_ORDER.indexOf(operatorRank);
+  return { track: track, rank: ranks[idx], tier: operatorTier };
 }
 function dailyQuip(seed, quips) { if (!quips || quips.length===0) return ''; return quips[Math.abs(seed) % quips.length].text; }
 function hashStr(s) { let h=0; for (let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i))|0; } return h; }
