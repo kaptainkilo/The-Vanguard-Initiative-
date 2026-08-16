@@ -109,28 +109,41 @@ function computePlanetControl(locProgress) {
 // ---------- Hex-grid AO visualization ----------
 // Deterministically generated from a Campaign's real Locations + their live
 // progress %, so it can never drift out of sync with the actual mechanic
-// (computeLocationProgress). Locations get contiguous row-bands; within a
-// band, hexes secure left-to-right, top-to-bottom — a front line advancing.
+// (computeLocationProgress). Each Location gets its own anchor point spread
+// around the grid; every hex belongs to whichever anchor is nearest, forming
+// an organic region rather than a straight band. Within a region, hexes
+// secure from the anchor outward as that Location's progress climbs.
 const HEX_GRID_COLS = 10, HEX_GRID_ROWS = 6, HEX_SIZE = 26;
+function locationAnchor(idx, n, cols, rows) {
+  if (n === 1) return { row: rows/2, col: cols/2 };
+  const angle = (idx / n) * 2 * Math.PI - Math.PI/2;
+  const centerRow = rows/2, centerCol = cols/2;
+  return { row: centerRow + (rows*0.36) * Math.sin(angle), col: centerCol + (cols*0.36) * Math.cos(angle) };
+}
 function computeHexGrid(camp, locProgress) {
   const n = camp.locations.length;
   if (n === 0) return { cols: HEX_GRID_COLS, rows: HEX_GRID_ROWS, hexes: [] };
+  const anchors = camp.locations.map((loc, i) => Object.assign({ locationId: loc.id }, locationAnchor(i, n, HEX_GRID_COLS, HEX_GRID_ROWS)));
   const hexes = [];
   for (let row = 0; row < HEX_GRID_ROWS; row++) {
-    const bandIdx = Math.min(n - 1, Math.floor(row * n / HEX_GRID_ROWS));
-    const loc = camp.locations[bandIdx];
     for (let col = 0; col < HEX_GRID_COLS; col++) {
-      hexes.push({ row: row, col: col, locationId: loc.id, locationName: loc.name });
+      let nearest = anchors[0], nearestDistSq = Infinity;
+      anchors.forEach(a => {
+        const distSq = (row-a.row)*(row-a.row) + (col-a.col)*(col-a.col);
+        if (distSq < nearestDistSq) { nearestDistSq = distSq; nearest = a; }
+      });
+      hexes.push({ row: row, col: col, locationId: nearest.locationId, distFromAnchor: Math.sqrt(nearestDistSq) });
     }
   }
-  const bandHexes = {};
-  hexes.forEach(h => { (bandHexes[h.locationId] = bandHexes[h.locationId] || []).push(h); });
-  Object.keys(bandHexes).forEach(locId => {
-    const bandArr = bandHexes[locId];
+  const regionHexes = {};
+  hexes.forEach(h => { (regionHexes[h.locationId] = regionHexes[h.locationId] || []).push(h); });
+  Object.keys(regionHexes).forEach(locId => {
+    const region = regionHexes[locId];
+    region.sort((a,b) => a.distFromAnchor - b.distFromAnchor); // secure from the anchor outward
     const prog = locProgress.find(l => l.id === locId);
     const pct = prog ? prog.pct : 0;
-    const securedCount = Math.round(bandArr.length * (pct / 100));
-    bandArr.forEach((h, idx) => { h.secured = idx < securedCount; });
+    const securedCount = Math.round(region.length * (pct / 100));
+    region.forEach((h, idx) => { h.secured = idx < securedCount; });
   });
   return { cols: HEX_GRID_COLS, rows: HEX_GRID_ROWS, hexes: hexes };
 }
@@ -163,9 +176,12 @@ function HexGridMap({ grid, pois, onHexClick, onSelectPOI }) {
       {(pois||[]).map(p => {
         const c = hexCenter(p.row, p.col);
         return (
-          <g key={p.id} onClick={()=> onSelectPOI && onSelectPOI(p)} style={{cursor: onSelectPOI ? 'pointer' : 'default'}}>
-            <circle cx={c.x} cy={c.y} r="6" fill="var(--threat)" stroke="#fff" strokeWidth="1" />
-            <text x={c.x} y={c.y-10} fontSize="9" fill="var(--text)" textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{p.name}</text>
+          <g key={p.id} transform={"translate("+c.x+","+c.y+")"} onClick={()=> onSelectPOI && onSelectPOI(p)} style={{cursor: onSelectPOI ? 'pointer' : 'default'}}>
+            {/* flag marker: pole, pennant, base anchor — reads as a real waypoint, not a plain dot */}
+            <line x1="0" y1="9" x2="0" y2="-11" stroke="var(--threat)" strokeWidth="2" />
+            <polygon points="0,-11 11,-6.5 0,-2" fill="var(--threat)" stroke="#fff" strokeWidth="0.75" />
+            <circle cx="0" cy="10" r="2.5" fill="var(--threat)" stroke="#fff" strokeWidth="0.75" />
+            <text x="0" y="-16" fontSize="9" fill="var(--text)" textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{p.name}</text>
           </g>
         );
       })}
