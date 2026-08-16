@@ -58,6 +58,73 @@ function computePlanetControl(locProgress) {
   return locProgress.reduce((s, l) => s + l.pct, 0) / locProgress.length;
 }
 
+// ---------- Hex-grid AO visualization ----------
+// Deterministically generated from a Campaign's real Locations + their live
+// progress %, so it can never drift out of sync with the actual mechanic
+// (computeLocationProgress). Locations get contiguous row-bands; within a
+// band, hexes secure left-to-right, top-to-bottom — a front line advancing.
+const HEX_GRID_COLS = 10, HEX_GRID_ROWS = 6, HEX_SIZE = 26;
+function computeHexGrid(camp, locProgress) {
+  const n = camp.locations.length;
+  if (n === 0) return { cols: HEX_GRID_COLS, rows: HEX_GRID_ROWS, hexes: [] };
+  const hexes = [];
+  for (let row = 0; row < HEX_GRID_ROWS; row++) {
+    const bandIdx = Math.min(n - 1, Math.floor(row * n / HEX_GRID_ROWS));
+    const loc = camp.locations[bandIdx];
+    for (let col = 0; col < HEX_GRID_COLS; col++) {
+      hexes.push({ row: row, col: col, locationId: loc.id, locationName: loc.name });
+    }
+  }
+  const bandHexes = {};
+  hexes.forEach(h => { (bandHexes[h.locationId] = bandHexes[h.locationId] || []).push(h); });
+  Object.keys(bandHexes).forEach(locId => {
+    const bandArr = bandHexes[locId];
+    const prog = locProgress.find(l => l.id === locId);
+    const pct = prog ? prog.pct : 0;
+    const securedCount = Math.round(bandArr.length * (pct / 100));
+    bandArr.forEach((h, idx) => { h.secured = idx < securedCount; });
+  });
+  return { cols: HEX_GRID_COLS, rows: HEX_GRID_ROWS, hexes: hexes };
+}
+function hexCenter(row, col) {
+  const hexHorizSpacing = HEX_SIZE * 1.5;
+  const hexVertSpacing = Math.sqrt(3) * HEX_SIZE;
+  const x = col * hexHorizSpacing + HEX_SIZE + 4;
+  const y = row * hexVertSpacing + (col % 2 === 1 ? hexVertSpacing / 2 : 0) + HEX_SIZE + 4;
+  return { x, y };
+}
+function hexPoints(cx, cy) {
+  return [0, 60, 120, 180, 240, 300].map(angle => {
+    const rad = Math.PI / 180 * angle;
+    return (cx + HEX_SIZE * Math.cos(rad)).toFixed(1) + ',' + (cy + HEX_SIZE * Math.sin(rad)).toFixed(1);
+  }).join(' ');
+}
+function HexGridMap({ grid, pois, onHexClick, onSelectPOI }) {
+  const width = grid.cols * (HEX_SIZE*1.5) + HEX_SIZE*2 + 8;
+  const height = grid.rows * (Math.sqrt(3)*HEX_SIZE) + Math.sqrt(3)*HEX_SIZE/2 + HEX_SIZE*2 + 8;
+  return (
+    <svg width="100%" viewBox={"0 0 "+width+" "+height} style={{background:'#05070d', borderRadius:4}}>
+      {grid.hexes.map(h => {
+        const c = hexCenter(h.row, h.col);
+        return <polygon key={h.row+'_'+h.col} points={hexPoints(c.x, c.y)}
+          fill={h.secured ? 'rgba(57,255,20,0.25)' : 'rgba(255,255,255,0.03)'}
+          stroke={h.secured ? 'var(--amber)' : 'var(--border)'} strokeWidth="1"
+          onClick={onHexClick ? ()=>onHexClick(h.row, h.col) : undefined}
+          style={onHexClick ? {cursor:'pointer'} : {}} />;
+      })}
+      {(pois||[]).map(p => {
+        const c = hexCenter(p.row, p.col);
+        return (
+          <g key={p.id} onClick={()=> onSelectPOI && onSelectPOI(p)} style={{cursor: onSelectPOI ? 'pointer' : 'default'}}>
+            <circle cx={c.x} cy={c.y} r="6" fill="var(--threat)" stroke="#fff" strokeWidth="1" />
+            <text x={c.x} y={c.y-10} fontSize="9" fill="var(--text)" textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{p.name}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ---------- Squad Raid progress (same soft-cap contribution logic as Campaigns) ----------
 function computeRaidObjectiveProgress(instance, area, logs) {
   return area.objectives.map(obj => {
