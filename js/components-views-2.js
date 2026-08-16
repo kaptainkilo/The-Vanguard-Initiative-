@@ -339,7 +339,7 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
   const deployedCampaign = op.currentDeploymentId ? campaigns.find(c => c.id === op.currentDeploymentId) : null;
   const rank = computeRank(orsData.ors, op.id, logs, campaigns, status);
   const rankTier = computeRankTier(rank, orsData.ors, op.id, logs, campaigns);
-  const commandRank = computeCommandRank(op);
+  const commandRank = computeCommandRank(op, orsData.ors, op.id, logs, campaigns, status);
   const mcp = computeMCP(op.id, campaigns, logs);
   const nri = nextRankInfo(rank, rankTier, orsData.ors, op.id, logs, campaigns, status);
   const specUnlocked = RANK_ORDER.indexOf(rank) >= RANK_ORDER.indexOf('Operator');
@@ -584,7 +584,7 @@ function Roster({ operators, campaigns, logs, onView }) {
             const deployedCampaign = op.currentDeploymentId ? campaigns.find(c=>c.id===op.currentDeploymentId) : null;
             const rank = computeRank(orsData.ors, op.id, logs, campaigns, status);
             const rankTier = computeRankTier(rank, orsData.ors, op.id, logs, campaigns);
-            const commandRank = computeCommandRank(op);
+            const commandRank = computeCommandRank(op, orsData.ors, op.id, logs, campaigns, status);
             const opLogs = logs.filter(l => l.operatorId===op.id);
             const lastActive = opLogs.length ? opLogs.reduce((max,l)=>l.date>max?l.date:max, opLogs[0].date) : '\u2014';
             return (
@@ -690,4 +690,3 @@ function Comms({ chat, operators, squads, activeOp, onSend }) {
     </div>
   );
 }
-
