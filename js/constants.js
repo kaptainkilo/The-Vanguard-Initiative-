@@ -1,4 +1,3 @@
-
 const { useState, useEffect, useMemo, useRef } = React;
 
 const AVATAR_COLORS = ['#FFB238','#E4572E','#6FCF97','#7CA9E8','#C98AD1','#F2C94C'];
@@ -35,16 +34,11 @@ const RANK_UP_LINES = {
   'Vanguard': "There's a reason this rank has a name and not just a number. You are what the Initiative was built to create. Command salutes you.",
 };
 
-// Parallel Command tracks — placeholder names, real military-style ladders
-// mirroring the depth of the Operator track (5 ranks x 3 tiers each), but
-// advanced by tenure-in-role instead of ORS. Names are provisional and will
-// be swapped once real insignia art exists.
-const JR_COMMAND_RANKS = ['Corporal','Sergeant','Staff Sergeant','Sergeant First Class','Master Sergeant'];
-const COMMAND_RANKS = ['Lieutenant','Captain','Major','Lieutenant Colonel','Colonel'];
-// Days-of-continuous-tenure thresholds per rank tier — shared shape for both tracks.
-const COMMAND_TENURE_TIERS = [
-  [0, 20, 40], [60, 80, 100], [120, 150, 180], [210, 240, 270], [300, 330, 365],
-];
+// Parallel Command tracks — locked names, mirroring the depth AND progression
+// of the Operator track exactly (same ORS/Days Active/Campaigns thresholds via
+// computeRank/computeRankTier, just relabeled — see computeCommandRank).
+const JR_COMMAND_RANKS = ['Lace','Sergeant','Spear Sergeant','War Sergeant','Warden'];
+const COMMAND_RANKS = ['Lieutenant','First Lieutenant','Captain','Commander','Senior Commander'];
 
 // COMMAND_QUIPS moved to the database (command_quips table) — admin-editable in the Admin Panel.
 // EXERCISES and PROTOCOL_SESSIONS moved to the database (exercises / protocol_sessions tables) — fetched at load time, admin-editable in the Admin Panel.
