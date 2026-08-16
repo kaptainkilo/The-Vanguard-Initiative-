@@ -18,7 +18,7 @@ function RaidObjectiveAdder({ onAdd }) {
   );
 }
 
-function AdminPanel({ operators, campaigns, onUpdateOperators, onUpdateCampaigns, exercises, protocolSessions, onSaveExercise, onDeleteExercise, onSaveProtocolSession, onDeleteProtocolSession, quips, onSaveQuip, onDeleteQuip, raidTemplates, onSaveRaidTemplate, onDeleteRaidTemplate }) {
+function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCampaigns, exercises, protocolSessions, onSaveExercise, onDeleteExercise, onSaveProtocolSession, onDeleteProtocolSession, quips, onSaveQuip, onDeleteQuip, raidTemplates, onSaveRaidTemplate, onDeleteRaidTemplate }) {
   const [editingId, setEditingId] = useState(campaigns[0] ? campaigns[0].id : null);
   const [savedMsg, setSavedMsg] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -337,7 +337,7 @@ function AdminPanel({ operators, campaigns, onUpdateOperators, onUpdateCampaigns
                 <td><select value={o.ageDivision} onChange={e=>updateOpField(o.id,'ageDivision',e.target.value)}>{AGE_DIVISIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></td>
                 <td><input type="checkbox" checked={!!o.isAdmin} onChange={e=>updateOpField(o.id,'isAdmin',e.target.checked)} /></td>
                 <td><input type="checkbox" checked={!!o.isModerator} onChange={e=>updateOpField(o.id,'isModerator',e.target.checked)} /></td>
-                <td className="dim" style={{fontSize:11}}>{commandRankDisplay(computeCommandRank(o)) || '—'}</td>
+                <td className="dim" style={{fontSize:11}}>{(() => { const oOrs = computeORS(o.id, o, logs); const oStatus = computeReadinessStatus(o.id, logs); return commandRankDisplay(computeCommandRank(o, oOrs.ors, o.id, logs, campaigns, oStatus)) || '—'; })()}</td>
                 <td>
                   {confirmDelete===o.id ? (
                     <span style={{display:'flex',gap:6}}><button className="small danger" onClick={()=>deleteOperator(o.id)}>Confirm</button><button className="small ghost" onClick={()=>setConfirmDelete(null)}>Cancel</button></span>
