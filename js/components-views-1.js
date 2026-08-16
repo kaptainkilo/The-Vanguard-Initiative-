@@ -1,4 +1,5 @@
-function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign, onGoCampaigns, streak, quips }) {
+function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign, onGoCampaigns, streak, quips, campaignPOIs }) {
+  const [selectedPOI, setSelectedPOI] = useState(null);
   const orsData = computeORS(activeOp.id, activeOp, logs);
   const status = computeReadinessStatus(activeOp.id, logs);
   const rank = computeRank(orsData.ors, activeOp.id, logs, campaigns, status);
@@ -6,6 +7,8 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
   const commandRank = computeCommandRank(activeOp, orsData.ors, activeOp.id, logs, campaigns, status);
   const locProgress = deployedCampaign ? computeLocationProgress(deployedCampaign, logs) : [];
   const planetPct = deployedCampaign ? computePlanetControl(locProgress) : 0;
+  const hexGrid = deployedCampaign ? computeHexGrid(deployedCampaign, locProgress) : null;
+  const myPOIs = deployedCampaign ? (campaignPOIs||[]).filter(p=>p.campaignId===deployedCampaign.id) : [];
   const daysLeft = deployedCampaign ? Math.max(0, deployedCampaign.durationDays - daysBetween(deployedCampaign.startDate, todayStr())) : 0;
   const quip = dailyQuip(hashStr(todayStr()), quips);
   const loggedToday = logs.some(l => l.operatorId===activeOp.id && l.date===todayStr());
@@ -31,25 +34,33 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
         <div className="panel">
           <div className="bracket-label">Your Deployment</div>
           <div className="disp panel-title">{deployedCampaign.name}</div>
-          <div className="dim mono" style={{fontSize:12}}>Threat: {deployedCampaign.threat} · {deployedCampaign.sector} · {daysLeft} days remaining</div>
+          <div className="dim mono" style={{fontSize:12}}>Threat: {deployedCampaign.threat} · {deployedCampaign.sector} · {daysLeft} days remaining · Control: <span className="amber">{Math.round(planetPct)}%</span></div>
           <div style={{fontSize:12,fontStyle:'italic',color:'var(--amber-dim)',marginTop:10}}>"{campaignMilestoneLine(deployedCampaign, planetPct)}"</div>
-          <div style={{marginTop:18}} className="gauge-wrap">
-            <Gauge pct={planetPct} />
-            <div style={{flex:1,minWidth:220}}>
-              {locProgress.map(loc => (
-                <div key={loc.id} className="loc-row">
-                  <div className="loc-head"><span className="loc-name">{loc.name}</span><span className="loc-pct mono">{Math.round(loc.pct)}%</span></div>
-                  <div className="bar-track"><div className="bar-fill" style={{width: loc.pct+'%'}}></div></div>
-                  <div className="loc-target">{loc.total} / {loc.target} {loc.unit}</div>
-                  {loc.briefing && (
-                    <details style={{marginTop:4}}>
-                      <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace"}}>Briefing</summary>
-                      <div style={{fontSize:11,lineHeight:1.6,color:'var(--text-dim)',marginTop:6,whiteSpace:'pre-line'}}>{loc.briefing}</div>
-                    </details>
-                  )}
-                </div>
-              ))}
+          <div style={{marginTop:16}}>
+            <HexGridMap grid={hexGrid} pois={myPOIs} onSelectPOI={setSelectedPOI} />
+          </div>
+          {selectedPOI && (
+            <div style={{marginTop:10,padding:'10px 12px',border:'1px solid var(--threat)',borderRadius:2}}>
+              <div style={{display:'flex',justifyContent:'space-between'}}>
+                <strong style={{fontSize:12}}>{selectedPOI.name}</strong>
+                <span className="dim" style={{cursor:'pointer',fontSize:11}} onClick={()=>setSelectedPOI(null)}>✕</span>
+              </div>
+              {selectedPOI.briefing && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:6,whiteSpace:'pre-line'}}>{selectedPOI.briefing}</div>}
             </div>
+          )}
+          <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:10}}>
+            {locProgress.map(loc => (
+              <div key={loc.id} className="loc-row">
+                <div className="loc-head"><span className="loc-name">{loc.name}</span><span className="loc-pct mono">{Math.round(loc.pct)}% · {loc.total} / {loc.target} {loc.category} {loc.unit}</span></div>
+                {loc.objective && <div className="dim" style={{fontSize:11,marginTop:2}}>{loc.objective}</div>}
+                {loc.briefing && (
+                  <details style={{marginTop:4}}>
+                    <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace"}}>Briefing</summary>
+                    <div style={{fontSize:11,lineHeight:1.6,color:'var(--text-dim)',marginTop:6,whiteSpace:'pre-line'}}>{loc.briefing}</div>
+                  </details>
+                )}
+              </div>
+            ))}
           </div>
           {deployedCampaign.lore && (
             <details style={{marginTop:16}}>
@@ -73,8 +84,7 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
             <RankInsignia rank={rank} tier={rankTier} size={44} />
             {activeOp.specialization && <SpecialtyBadge specialization={activeOp.specialization} size={40} />}
           </div>
-          <div className="stat-row"><span>Rank</span><span className="pill rank">{rankDisplay(rank, rankTier)}</span></div>
-          {commandRank && <div className="stat-row"><span>Command Rank</span><span className="pill rank">{commandRankDisplay(commandRank)}</span></div>}
+          <div className="stat-row"><span>Rank</span><span className="pill rank">{commandRank ? commandRankDisplay(commandRank) : rankDisplay(rank, rankTier)}</span></div>
           <div className="stat-row"><span>Readiness (ORS)</span><span className="stat-val">{orsData.ors} / 100</span></div>
           <div className="stat-row"><span>Status</span><span className={"status-pill "+status.cls}>{status.label}</span></div>
           <div className="sub-bars">
@@ -96,7 +106,7 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
   );
 }
 
-function Campaigns({ campaigns, activeOp, logs, onDeploy, onUndeploy, onClaimReinforcement }) {
+function Campaigns({ campaigns, activeOp, logs, onDeploy, onUndeploy, onClaimReinforcement, campaignPOIs }) {
   const deployedId = activeOp.currentDeploymentId;
   const nonCampMCP = nonCampaignMCP(activeOp.id, logs);
   const mcpToNextDrop = Math.max(0, 200 - (nonCampMCP - activeOp.mcpAtLastReinforcement));
@@ -137,6 +147,12 @@ function Campaigns({ campaigns, activeOp, logs, onDeploy, onUndeploy, onClaimRei
             </div>
             <div style={{marginTop:12,fontSize:12}}>Control: <span className="amber mono">{Math.round(planetPct)}%</span> · Deployed: {camp.deployedOperatorIds.length}{camp.lockedAt ? ` (locked at ${camp.lockedDeployedCount})` : ''}</div>
             <div style={{fontSize:11,fontStyle:'italic',color:'var(--amber-dim)',marginTop:6}}>"{campaignMilestoneLine(camp, planetPct)}"</div>
+            <details style={{marginTop:8}}>
+              <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace",letterSpacing:'0.05em'}}>AO MAP</summary>
+              <div style={{marginTop:8,maxWidth:360}}>
+                <HexGridMap grid={computeHexGrid(camp, locProg)} pois={(campaignPOIs||[]).filter(p=>p.campaignId===camp.id)} />
+              </div>
+            </details>
             {camp.lore && (
               <details style={{marginTop:8}}>
                 <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace",letterSpacing:'0.05em'}}>FULL BRIEFING</summary>
