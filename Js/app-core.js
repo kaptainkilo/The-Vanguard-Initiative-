@@ -21,6 +21,7 @@ function App() {
   const [duels, setDuels] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [dismissals, setDismissals] = useState([]);
+  const [cheers, setCheers] = useState([]);
   const [tab, setTab] = useState('command');
   const [showReset, setShowReset] = useState(false);
   const [viewDossierId, setViewDossierId] = useState(null);
@@ -34,7 +35,7 @@ function App() {
   }, []);
 
   async function refetchAll() {
-    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals } = await fetchAllData();
+    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers } = await fetchAllData();
     setOperators(ops); setCampaigns(camps); setLogs(lgs); setChat(ch); setCodexEntries(cx); setSquads(squads);
     setExercises(exercises); setProtocolSessions(protocolSessions); setQuips(quips);
     setAwards(awards); setPersonalRecords(personalRecords);
@@ -44,6 +45,7 @@ function App() {
     setSeasons(seasons);
     setDuels(duels);
     setAnnouncements(announcements); setDismissals(dismissals);
+    setCheers(cheers);
   }
 
   useEffect(() => {
@@ -143,8 +145,8 @@ function App() {
     for (const r of removed) await sb.from('codex_entries').delete().eq('id', r.id);
     for (const e of newEntries) {
       const oldE = old.find(x=>x.id===e.id);
-      if (!oldE) await sb.from('codex_entries').insert({ category: e.category, title: e.title, body: e.body });
-      else if (oldE.title!==e.title || oldE.body!==e.body) await sb.from('codex_entries').update({title:e.title, body:e.body}).eq('id', e.id);
+      if (!oldE) await sb.from('codex_entries').insert({ category: e.category, title: e.title, body: e.body, icon_ref: e.iconRef||null });
+      else if (oldE.title!==e.title || oldE.body!==e.body || oldE.iconRef!==e.iconRef) await sb.from('codex_entries').update({title:e.title, body:e.body, icon_ref: e.iconRef||null}).eq('id', e.id);
     }
     await refetchAll();
   }
@@ -307,6 +309,35 @@ function App() {
     await sb.from('announcement_dismissals').insert({ operator_id: operatorId, announcement_id: announcementId });
     await refetchAll();
   }
+  async function cheerMessage(operatorId, messageId) {
+    if (cheers.some(c => c.operatorId===operatorId && c.messageId===messageId)) return; // already cheered
+    const { error } = await sb.from('message_cheers').insert({ operator_id: operatorId, message_id: messageId });
+    if (error) { await refetchAll(); return; } // someone else's insert may have raced ahead; just resync
+    const totalGiven = cheers.filter(c=>c.operatorId===operatorId).length + 1;
+    const milestones = [10, 25, 50, 100];
+    if (milestones.includes(totalGiven)) {
+      const type = 'cheers_given_'+totalGiven;
+      if (!awards.some(a=>a.operatorId===operatorId && a.awardType===type)) {
+        await sb.from('awards').insert({ operator_id: operatorId, award_type: type, title: totalGiven+' Squadmates Cheered', description: 'Showed up for '+totalGiven+' squadmates\u2019 wins. That counts as much as your own.' });
+      }
+    }
+    await refetchAll();
+  }
+  // Three simple one-time "first steps" milestones. Each checks a state that's
+  // already tracked elsewhere (no new columns needed) and grants once, ever.
+  async function checkMilestoneAwards(op, logsSnapshot, existingAwards) {
+    const grants = [];
+    if (logsSnapshot.some(l=>l.operatorId===op.id && l.type==='campaign') && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_campaign')) {
+      grants.push({ operator_id: op.id, award_type: 'first_campaign', title: 'First Deployment', description: 'Your first logged Campaign contribution. Command has your file open now.' });
+    }
+    if (op.squadId && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_squad')) {
+      grants.push({ operator_id: op.id, award_type: 'first_squad', title: 'Squad Up', description: 'Joined your first Squad. You don\u2019t have to do this alone.' });
+    }
+    if (op.specialization && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_specialization')) {
+      grants.push({ operator_id: op.id, award_type: 'first_specialization', title: 'Chosen Path', description: 'Selected a Specialization: '+op.specialization+'.' });
+    }
+    if (grants.length) await sb.from('awards').insert(grants);
+  }
   async function saveAnnouncement(announcement) {
     const exists = announcements.some(a=>a.id===announcement.id);
     if (exists) await sb.from('announcements').update({ title: announcement.title, body: announcement.body, active: announcement.active }).eq('id', announcement.id);
@@ -436,7 +467,8 @@ function App() {
     checkStreakAward(op, logs, awards);
     checkServiceStripAward(op, logs, campaigns, awards);
     checkChallengeCompletion(op, challengePool, challengeCompletions, logs, awards);
-  }, [streakTop, todayLogCountTop, loaded, opOnboarded]);
+    checkMilestoneAwards(op, logs, awards);
+  }, [streakTop, todayLogCountTop, loaded, opOnboarded, op && op.squadId, op && op.specialization]);
 
   useEffect(() => {
     if (!loaded || !opOnboarded || !op) return;
@@ -520,7 +552,7 @@ function App() {
           {tab==='dossier' && <Dossier op={dossierOp} activeOpId={op.id} operators={operators} campaigns={campaigns} logs={logs} squads={squads} awards={awards} personalRecords={personalRecords} onUpdateOperator={updateOperator} onUploadAvatar={uploadAvatar} />}
           {tab==='roster' && <Roster operators={operators} campaigns={campaigns} logs={logs} onView={(id)=>{setViewDossierId(id); setTab('dossier');}} />}
           {tab==='codex' && <Codex entries={codexEntries} isAdmin={op.isAdmin} onUpdate={updateCodex} />}
-          {tab==='comms' && <Comms chat={chat} operators={operators} squads={squads} activeOp={op} onSend={sendChat} />}
+          {tab==='comms' && <Comms chat={chat} operators={operators} squads={squads} activeOp={op} onSend={sendChat} cheers={cheers} onCheer={cheerMessage} />}
           {tab==='aar' && <AARLog operators={operators} campaigns={campaigns} logs={logs} />}
           {tab==='admin' && op.isAdmin && <AdminPanel operators={operators} campaigns={campaigns} logs={logs} onUpdateOperators={updateOperators} onUpdateCampaigns={updateCampaigns}
             exercises={exercises} protocolSessions={protocolSessions} onSaveExercise={saveExercise} onDeleteExercise={deleteExercise}
