@@ -73,7 +73,7 @@ function chatToRow(m) {
   return { author_id: m.authorId, author_name: m.authorName, is_command: m.isCommand, text: m.text, timestamp: m.timestamp, channel: m.channel || 'main', squad_id: m.squadId || null };
 }
 function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date }; }
-function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body }; }
+function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body, iconRef: c.icon_ref || '' }; }
 function rowToQuip(q) { return { id: q.id, text: q.text }; }
 function rowToChallenge(c) { return { id: c.id, name: c.name, muscleGroup: c.muscle_group, target: Number(c.target), unit: c.unit }; }
 function rowToChallengeCompletion(c) { return { id: c.id, operatorId: c.operator_id, date: c.date, poolId: c.pool_id }; }
@@ -85,6 +85,7 @@ function rowToDuel(d) {
 }
 function rowToAnnouncement(a) { return { id: a.id, title: a.title, body: a.body, active: a.active, createdAt: a.created_at }; }
 function rowToDismissal(d) { return { id: d.id, operatorId: d.operator_id, announcementId: d.announcement_id }; }
+function rowToCheer(c) { return { id: c.id, messageId: c.message_id, operatorId: c.operator_id }; }
 function rowToAward(a) { return { id: a.id, operatorId: a.operator_id, awardType: a.award_type, title: a.title, description: a.description, awardedAt: a.awarded_at }; }
 function rowToPR(p) { return { id: p.id, operatorId: p.operator_id, exercise: p.exercise, value: Number(p.value), unit: p.unit, achievedAt: p.achieved_at }; }
 function rowToRaidObjective(o) { return { id: o.id, raidAreaId: o.raid_area_id, name: o.name, muscleGroup: o.muscle_group, unit: o.unit, target: Number(o.target) }; }
@@ -357,6 +358,9 @@ async function fetchAllData() {
   const { data: dismissalRows } = await sb.from('announcement_dismissals').select('*');
   const dismissals = (dismissalRows||[]).map(rowToDismissal);
 
+  const { data: cheerRows } = await sb.from('message_cheers').select('*');
+  const cheers = (cheerRows||[]).map(rowToCheer);
+
   // auto-lock join windows / auto-resolve campaigns / auto-detect Control % milestones, writing back any changes
   for (let i = 0; i < camps.length; i++) {
     let c = camps[i];
@@ -428,6 +432,6 @@ async function fetchAllData() {
     }
   }
 
-  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals };
+  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers };
 }
 
