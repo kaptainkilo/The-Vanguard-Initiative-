@@ -338,12 +338,9 @@ function computeORS(operatorId, operator, logs) {
   const windowDays = Math.min(30, Math.max(1, daysBetween(firstLogDate, todayStr()) + 1));
   const uniqueDaysWithLog = new Set(opLogs.map(l => l.date)).size;
   const protocolSessionDays = new Set(opLogs.filter(l => l.type === 'protocol').map(l => l.date)).size;
-  const campaignLogs = opLogs.filter(l => l.type === 'campaign');
-  const uniqueCampaignDays = new Set(campaignLogs.map(l => l.date)).size;
   const scheduledSessions = (operator.weeklyTarget / 7) * windowDays;
   const protocolCompletionRate = scheduledSessions > 0 ? Math.min(100, (protocolSessionDays / scheduledSessions) * 100) : 0;
   const aarSubmissionRate = Math.min(100, (uniqueDaysWithLog / windowDays) * 100);
-  const campaignActiveDayRate = Math.min(100, (uniqueCampaignDays / windowDays) * 100);
   const baselineImp = computeBaselineImprovement(operator);
   const overload = computeProgressiveOverload(operatorId, logs);
 
@@ -366,18 +363,37 @@ function computeORS(operatorId, operator, logs) {
     const possibleCheckins = activeHabits.length * windowDays;
     personalDevVal = possibleCheckins > 0 ? Math.min(100, (habitLogs.length / possibleCheckins) * 100) : 0;
   }
+  // Squad Contribution used to just be a mislabeled copy of your own Campaign
+  // logging rate — nothing about it was actually squad-related, and a
+  // completely solo operator scored the same as an engaged squad member.
+  // Now it's gated on actually being in a squad (mirrors how Personal
+  // Development is gated on having an active habit — solo operators simply
+  // don't have this slice, and ORS weight redistributes across the rest, so
+  // opting out of squads is never penalized), and measures real shared-
+  // objective participation: days you contributed to a Campaign or an active
+  // Raid. Duels are deliberately left out here — their progress is computed
+  // live from ordinary protocol logs with no dedicated log type, so there's
+  // no clean way to attribute a specific day to Duel participation without a
+  // much bigger change to what computeORS has access to.
+  const inSquad = !!operator.squadId;
+  let squadVal = null;
+  if (inSquad) {
+    const squadLogs = opLogs.filter(l => l.type === 'campaign' || l.type === 'raid');
+    const uniqueSquadDays = new Set(squadLogs.map(l => l.date)).size;
+    squadVal = Math.min(100, (uniqueSquadDays / windowDays) * 100);
+  }
   const components = [
     { key:'physical', weight:0.30, value: physicalVal, available: true },
     { key:'discipline', weight:0.30, value: aarSubmissionRate, available: true },
     { key:'personalDev', weight:0.20, value: personalDevVal, available: personalDevVal !== null },
-    { key:'squad', weight:0.20, value: campaignActiveDayRate, available: true },
+    { key:'squad', weight:0.20, value: squadVal, available: squadVal !== null },
   ];
   const availWeightSum = components.filter(c=>c.available).reduce((s,c)=>s+c.weight,0);
   let ors = 0;
   components.forEach(c => { if (c.available) ors += (c.weight/availWeightSum) * c.value; });
   ors = Math.round(ors);
   return { ors: ors, physical: Math.round(physicalVal), discipline: Math.round(aarSubmissionRate),
-    squad: Math.round(campaignActiveDayRate), personalDev: personalDevVal!==null?Math.round(personalDevVal):null,
+    squad: squadVal!==null?Math.round(squadVal):null, personalDev: personalDevVal!==null?Math.round(personalDevVal):null,
     windowDays: windowDays, baselineImp: baselineImp, overload: overload };
 }
 
@@ -725,6 +741,84 @@ const SPECIALTY_ICONS = {
     </g>
   ),
 };
+// ---------- Award Ribbons (start of the ribbon/medal system) ----------
+// Placeholder visuals for every Award family — real military ribbon-bar
+// styling (base color + accent stripes), with tier magnitude shown as a
+// small numeral badge so open-ended families (Service Strips) scale
+// cleanly without needing a distinct icon per possible tier.
+function parseAwardFamily(awardType) {
+  if (!awardType) return { family: 'unknown', tier: null };
+  if (awardType.startsWith('rank_')) return { family: 'rank', tier: null };
+  if (awardType.startsWith('campaign_')) return { family: 'campaign', tier: null };
+  if (awardType.startsWith('raid_')) return { family: 'raid', tier: null };
+  if (awardType.startsWith('duel_')) return { family: 'duel', tier: null };
+  if (awardType.startsWith('pr_')) return { family: 'pr', tier: null };
+  if (awardType.startsWith('streak_')) return { family: 'streak', tier: Number(awardType.split('_')[1]) };
+  if (awardType.startsWith('service_strip_')) return { family: 'service_strip', tier: Number(awardType.split('_')[2]) };
+  if (awardType.startsWith('challenges_')) return { family: 'challenges', tier: Number(awardType.split('_')[1]) };
+  if (awardType.startsWith('cheers_given_')) return { family: 'cheers', tier: Number(awardType.split('_')[2]) };
+  if (awardType === 'first_campaign' || awardType === 'first_squad' || awardType === 'first_specialization') return { family: 'milestone', tier: null };
+  return { family: 'unknown', tier: null };
+}
+const AWARD_FAMILY_STYLES = {
+  rank:             { color:'#F2C94C', secondary:'#8a6d1f' },
+  campaign:         { color:'#39FF14', secondary:'#1a7a0a' },
+  raid:             { color:'#E8453C', secondary:'#7a1f1a' },
+  duel:             { color:'#5DA9E8', secondary:'#1f4a7a' },
+  pr:               { color:'#F2994A', secondary:'#7a4a1f' },
+  streak:           { color:'#B57EDC', secondary:'#5a3a7a' },
+  service_strip:    { color:'#C9CDD6', secondary:'#5a5f6a' },
+  challenges:       { color:'#4ECDC4', secondary:'#1f6a63' },
+  cheers:           { color:'#FF6B9D', secondary:'#7a1f47' },
+  milestone:        { color:'#E8E6DD', secondary:'#6a6f68' },
+  unknown:          { color:'#8A9080', secondary:'#3a3f38' },
+};
+function AwardRibbon({ awardType, size }) {
+  const s = size || 44;
+  const h = s * 0.55;
+  const { family, tier } = parseAwardFamily(awardType);
+  const style = AWARD_FAMILY_STYLES[family] || AWARD_FAMILY_STYLES.unknown;
+  return (
+    <div style={{position:'relative', width:s, height:h, flexShrink:0}}>
+      <svg width={s} height={h} viewBox="0 0 100 55" style={{display:'block'}}>
+        <rect x="0" y="0" width="100" height="55" fill={style.color} />
+        <rect x="0" y="0" width="100" height="9" fill={style.secondary} />
+        <rect x="0" y="46" width="100" height="9" fill={style.secondary} />
+        <rect x="46" y="0" width="8" height="55" fill={style.secondary} opacity="0.6" />
+      </svg>
+      {tier ? (
+        <div style={{position:'absolute',bottom:-3,right:-3,background:'#05070d',color:style.color,fontSize:9,lineHeight:1,fontFamily:"'IBM Plex Mono',monospace",padding:'1px 4px',borderRadius:2,border:'1px solid '+style.color}}>{tier}</div>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------- Codex icon references ----------
+// A Codex entry can reference one or more real badge components via a simple
+// spec string, e.g. "rank:Operator:2,rank:Vanguard:3" or "specialty:Recon" or
+// "award:rank_Vanguard,award:streak_30". These are the SAME components used
+// live elsewhere in the app (Dossier, Command Center) — genuine reference
+// images that can never drift out of sync with what people actually see,
+// rather than separate static art that needs to be kept in sync by hand.
+function CodexIconRow({ iconRef, size }) {
+  if (!iconRef) return null;
+  const specs = iconRef.split(',').map(s=>s.trim()).filter(Boolean);
+  if (specs.length === 0) return null;
+  const s = size || 44;
+  return (
+    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+      {specs.map((spec, i) => {
+        const parts = spec.split(':');
+        const type = parts[0];
+        if (type === 'rank') return <RankInsignia key={i} rank={parts[1]} tier={Number(parts[2])||1} size={s} />;
+        if (type === 'specialty') return <SpecialtyBadge key={i} specialization={parts[1]} size={s} />;
+        if (type === 'award') return <AwardRibbon key={i} awardType={parts[1]} size={s} />;
+        return null;
+      })}
+    </div>
+  );
+}
+
 function SpecialtyBadge({ specialization, size }) {
   const s = size || 56;
   if (!specialization || !SPECIALTY_ICONS[specialization]) return null;
