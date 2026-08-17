@@ -684,21 +684,21 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns }) {
 }
 
 function Codex({ entries, isAdmin, onUpdate }) {
-  const categories = ['Lore','Planets','Enemies','Characters','Philosophy'];
+  const categories = ['Lore','Planets','Enemies','Characters','Field Guide','Philosophy'];
   const [activeCat, setActiveCat] = useState('Lore');
   const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({title:'',body:''});
+  const [draft, setDraft] = useState({title:'',body:'',iconRef:''});
   const [adding, setAdding] = useState(false);
 
-  function startEdit(entry) { setEditingId(entry.id); setDraft({title:entry.title, body:entry.body}); }
+  function startEdit(entry) { setEditingId(entry.id); setDraft({title:entry.title, body:entry.body, iconRef:entry.iconRef||''}); }
   function saveEdit() {
     onUpdate(entries.map(e => e.id===editingId ? Object.assign({}, e, draft) : e));
     setEditingId(null);
   }
   function saveNew() {
     if (!draft.title.trim()) return;
-    onUpdate(entries.concat([{id:'codex_'+Date.now(), category:activeCat, title:draft.title, body:draft.body}]));
-    setDraft({title:'',body:''}); setAdding(false);
+    onUpdate(entries.concat([{id:'codex_'+Date.now(), category:activeCat, title:draft.title, body:draft.body, iconRef:draft.iconRef}]));
+    setDraft({title:'',body:'',iconRef:''}); setAdding(false);
   }
   function deleteEntry(id) { onUpdate(entries.filter(e=>e.id!==id)); }
 
@@ -717,6 +717,7 @@ function Codex({ entries, isAdmin, onUpdate }) {
             <div>
               <input type="text" value={draft.title} onChange={e=>setDraft(Object.assign({},draft,{title:e.target.value}))} style={{marginBottom:8}} />
               <textarea value={draft.body} onChange={e=>setDraft(Object.assign({},draft,{body:e.target.value}))} rows="4" style={{width:'100%',marginBottom:8}} />
+              <input type="text" value={draft.iconRef} onChange={e=>setDraft(Object.assign({},draft,{iconRef:e.target.value}))} placeholder="Icon refs, e.g. rank:Operator:2,specialty:Recon,award:streak_30" style={{marginBottom:8}} />
               <div style={{display:'flex',gap:8}}>
                 <button className="primary small" onClick={saveEdit}>Save</button>
                 <button className="ghost small" onClick={()=>setEditingId(null)}>Cancel</button>
@@ -731,16 +732,18 @@ function Codex({ entries, isAdmin, onUpdate }) {
                   <button className="ghost small" onClick={()=>deleteEntry(entry.id)}>Delete</button>
                 </span>}
               </div>
+              <CodexIconRow iconRef={entry.iconRef} />
               <div style={{fontSize:12,lineHeight:1.7,color:'var(--text-dim)',marginTop:6}}>{entry.body}</div>
             </div>
           )}
         </div>
       ))}
-      {isAdmin && !adding && <button className="ghost small" onClick={()=>{setAdding(true); setDraft({title:'',body:''});}}>+ Add {activeCat} Entry</button>}
+      {isAdmin && !adding && <button className="ghost small" onClick={()=>{setAdding(true); setDraft({title:'',body:'',iconRef:''});}}>+ Add {activeCat} Entry</button>}
       {isAdmin && adding && (
         <div className="codex-entry">
           <input type="text" value={draft.title} onChange={e=>setDraft(Object.assign({},draft,{title:e.target.value}))} placeholder="Title" style={{marginBottom:8}} />
           <textarea value={draft.body} onChange={e=>setDraft(Object.assign({},draft,{body:e.target.value}))} placeholder="Body text" rows="4" style={{width:'100%',marginBottom:8}} />
+          <input type="text" value={draft.iconRef} onChange={e=>setDraft(Object.assign({},draft,{iconRef:e.target.value}))} placeholder="Icon refs, e.g. rank:Operator:2,specialty:Recon,award:streak_30" style={{marginBottom:8}} />
           <div style={{display:'flex',gap:8}}>
             <button className="primary small" onClick={saveNew}>Add Entry</button>
             <button className="ghost small" onClick={()=>setAdding(false)}>Cancel</button>
