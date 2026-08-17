@@ -415,9 +415,12 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
           <RankInsignia rank={commandRank ? commandRank.rank : rank} tier={commandRank ? commandRank.tier : rankTier} size={56} />
           {op.specialization && <SpecialtyBadge specialization={op.specialization} size={52} />}
           {featuredAward && (
-            <div style={{border:'1px solid var(--amber)',borderRadius:2,padding:'6px 12px',background:'rgba(57,255,20,0.06)'}}>
-              <div className="dim mono" style={{fontSize:9,letterSpacing:'0.05em'}}>FEATURED</div>
-              <div style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>{featuredAward.title}</div>
+            <div style={{display:'flex',gap:8,alignItems:'center',border:'1px solid var(--amber)',borderRadius:2,padding:'6px 12px',background:'rgba(57,255,20,0.06)'}}>
+              <AwardRibbon awardType={featuredAward.awardType} size={32} />
+              <div>
+                <div className="dim mono" style={{fontSize:9,letterSpacing:'0.05em'}}>FEATURED</div>
+                <div style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>{featuredAward.title}</div>
+              </div>
             </div>
           )}
         </div>
@@ -454,8 +457,8 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
           </div>
           <div style={{marginBottom:18}}>
             <div className="field-label" style={{marginBottom:4}}># Squad Contribution</div>
-            <div className="disp" style={{fontSize:20}}>{orsData.squad}</div>
-            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:orsData.squad+'%'}}></div></div>
+            <div className="disp" style={{fontSize:20}}>{orsData.squad === null ? '—' : orsData.squad}</div>
+            <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:(orsData.squad||0)+'%'}}></div></div>
           </div>
           <div style={{marginBottom:18}}>
             <div className="field-label" style={{marginBottom:4}}># Mission Contribution Points</div>
@@ -512,19 +515,22 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
         ) : (
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {myAwards.map(a => (
-              <div key={a.id} style={{border:'1px solid '+(op.featuredAwardId===a.id?'var(--amber)':'var(--border)'),borderRadius:2,padding:'10px 12px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div className="amber" style={{fontSize:13,fontWeight:600}}>{a.title}</div>
-                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    <div className="dim mono" style={{fontSize:10}}>{a.awardedAt ? a.awardedAt.slice(0,10) : ''}</div>
-                    {isOwnProfile && (
-                      op.featuredAwardId===a.id
-                        ? <button className="ghost small" onClick={()=>onUpdateOperator(Object.assign({},op,{featuredAwardId:null}))}>Unfeature</button>
-                        : <button className="ghost small" onClick={()=>onUpdateOperator(Object.assign({},op,{featuredAwardId:a.id}))}>Feature</button>
-                    )}
+              <div key={a.id} style={{display:'flex',gap:10,alignItems:'flex-start',border:'1px solid '+(op.featuredAwardId===a.id?'var(--amber)':'var(--border)'),borderRadius:2,padding:'10px 12px'}}>
+                <AwardRibbon awardType={a.awardType} size={40} />
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div className="amber" style={{fontSize:13,fontWeight:600}}>{a.title}</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <div className="dim mono" style={{fontSize:10}}>{a.awardedAt ? a.awardedAt.slice(0,10) : ''}</div>
+                      {isOwnProfile && (
+                        op.featuredAwardId===a.id
+                          ? <button className="ghost small" onClick={()=>onUpdateOperator(Object.assign({},op,{featuredAwardId:null}))}>Unfeature</button>
+                          : <button className="ghost small" onClick={()=>onUpdateOperator(Object.assign({},op,{featuredAwardId:a.id}))}>Feature</button>
+                      )}
+                    </div>
                   </div>
+                  {a.description && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:4}}>{a.description}</div>}
                 </div>
-                {a.description && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:4}}>{a.description}</div>}
               </div>
             ))}
           </div>
@@ -674,7 +680,7 @@ function AARLog({ operators, campaigns, logs }) {
   );
 }
 
-function Comms({ chat, operators, squads, activeOp, onSend }) {
+function Comms({ chat, operators, squads, activeOp, onSend, cheers, onCheer }) {
   const mySquad = activeOp.squadId ? squads.find(s=>s.id===activeOp.squadId) : null;
   const [channel, setChannel] = useState('main');
   const [text, setText] = useState('');
@@ -712,12 +718,24 @@ function Comms({ chat, operators, squads, activeOp, onSend }) {
 
       <div className="chat-scroll" ref={scrollRef}>
         {shown.length === 0 && <div className="empty"><div className="empty-title">No transmissions yet.</div></div>}
-        {shown.map(m => (
-          <div key={m.id} className={"chat-msg "+(m.isCommand?'command':(m.authorId===activeOp.id?'mine':'theirs'))}>
-            <div className="chat-meta">{!m.authorId ? 'VAL // AUTOMATED' : (m.isCommand ? 'COMMAND TRANSMISSION' : m.authorName)} · {new Date(m.timestamp).toLocaleString()}</div>
-            <div>{m.text}</div>
-          </div>
-        ))}
+        {shown.map(m => {
+          const msgCheers = (cheers||[]).filter(c=>c.messageId===m.id);
+          const iCheered = msgCheers.some(c=>c.operatorId===activeOp.id);
+          return (
+            <div key={m.id} className={"chat-msg "+(m.isCommand?'command':(m.authorId===activeOp.id?'mine':'theirs'))}>
+              <div className="chat-meta">{!m.authorId ? 'VAL // AUTOMATED' : (m.isCommand ? 'COMMAND TRANSMISSION' : m.authorName)} · {new Date(m.timestamp).toLocaleString()}</div>
+              <div>{m.text}</div>
+              {m.isCommand && (
+                <div style={{marginTop:6,display:'flex',alignItems:'center',gap:8}}>
+                  <button className={"small ghost"+(iCheered?' sel':'')} disabled={iCheered} onClick={()=>onCheer(activeOp.id, m.id)}>
+                    {iCheered ? '\u2705 Cheered' : '\ud83c\udf89 Cheer'}
+                  </button>
+                  {msgCheers.length > 0 && <span className="dim mono" style={{fontSize:11}}>{msgCheers.length} cheer{msgCheers.length===1?'':'s'}</span>}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {canPost ? (
