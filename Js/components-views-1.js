@@ -128,6 +128,11 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
             Status now reflects your logging frequency over time, not just whether you logged something recently.
           </div>
         </div>
+        <div style={{textAlign:'center',padding:'8px 0'}}>
+          <a href="https://ko-fi.com/leidolflokison" target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'var(--text-dim)',textDecoration:'none',opacity:0.7}}>
+            {'\u2764'} Support the Initiative
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -335,7 +340,7 @@ function squadStats(squad, operators, campaigns, logs, season) {
   return { memberCount: memberOps.length, totalMCP, avgORS, campaignContribution };
 }
 
-function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJoin, onLeave, onPromote, onDemote, onRemoveMember, onRename, onDisband, raidTemplates, raidInstances, onLaunchRaid, seasons, duels, onCreateDuel, onAcceptDuel, onDeclineDuel }) {
+function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRequestJoin, onLeave, onPromote, onDemote, onRemoveMember, onRename, onDisband, raidTemplates, raidInstances, onLaunchRaid, seasons, duels, onCreateDuel, onAcceptDuel, onDeclineDuel, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, onCreateSquadHabitChallenge, onJoinSquadHabitChallenge, onCheckinSquadHabitChallenge, joinRequests, onApproveJoinRequest, onDenyJoinRequest }) {
   const [newSquadName, setNewSquadName] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState('');
@@ -343,6 +348,7 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJo
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [launchingTemplateId, setLaunchingTemplateId] = useState(null);
   const [duelDraft, setDuelDraft] = useState({opponentSquadId:'', muscleGroup:'Any', target:'', unit:'reps', durationDays:'7'});
+  const [habitChallengeDraft, setHabitChallengeDraft] = useState({name:'', description:'', durationDays:'7'});
   const currentSeason = computeCurrentSeason(seasons);
 
   const mySquad = activeOp.squadId ? squads.find(s=>s.id===activeOp.squadId) : null;
@@ -366,11 +372,12 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJo
           {squads.map(s => {
             const stats = squadStats(s, operators, campaigns, logs, currentSeason);
             const full = stats.memberCount >= 10;
+            const pending = joinRequests.some(r => r.squadId===s.id && r.operatorId===activeOp.id && r.status==='pending');
             return (
               <div key={s.id} className="protocol-card">
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div><strong>{s.name}</strong> <span className="dim" style={{fontSize:11}}>— {stats.memberCount}/10 members · Avg ORS {stats.avgORS}</span></div>
-                  <button className="primary small" disabled={full} onClick={()=>onJoin(activeOp, s)}>{full?'Full':'Join'}</button>
+                  <button className={pending?'ghost small':'primary small'} disabled={full||pending} onClick={()=>onRequestJoin(activeOp, s)}>{full?'Full':(pending?'Request Pending':'Request to Join')}</button>
                 </div>
               </div>
             );
@@ -390,9 +397,27 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJo
 
   const allStats = squads.map(s => ({ squad: s, stats: squadStats(s, operators, campaigns, logs, currentSeason) }));
   const rankBy = (key) => allStats.slice().sort((a,b)=>b.stats[key]-a.stats[key]);
+  const pendingJoinRequests = joinRequests.filter(r => r.squadId===mySquad.id && r.status==='pending');
 
   return (
     <div>
+      {isLeadership && pendingJoinRequests.length > 0 && (
+        <div className="panel" style={{borderColor:'var(--amber)'}}>
+          <div className="bracket-label">Incoming Join Requests</div>
+          {pendingJoinRequests.map(r => {
+            const requester = operators.find(o=>o.id===r.operatorId);
+            return (
+              <div key={r.id} className="field-row">
+                <span>{requester ? requester.callsign : 'Unknown Operator'}</span>
+                <span style={{display:'flex',gap:8}}>
+                  <button className="primary small" onClick={()=>onApproveJoinRequest(r)}>Approve</button>
+                  <button className="ghost small" onClick={()=>onDenyJoinRequest(r.id)}>Deny</button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="panel">
         <div className="dossier-header">
           <div>
@@ -632,6 +657,73 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onJo
                   onCreateDuel(mySquad.id, duelDraft.opponentSquadId, duelDraft.muscleGroup, Number(duelDraft.target), duelDraft.muscleGroup==='Cardio'?'minutes':'reps', Number(duelDraft.durationDays));
                   setDuelDraft({opponentSquadId:'', muscleGroup:'Any', target:'', unit:'reps', durationDays:'7'});
                 }}>Issue Challenge</button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const myActiveChallenges = squadHabitChallenges.filter(c => c.squadId===mySquad.id && c.status==='active');
+        const myPastChallenges = squadHabitChallenges.filter(c => c.squadId===mySquad.id && c.status==='completed').slice(-5);
+        return (
+          <div>
+            {myActiveChallenges.length > 0 && (
+              <div className="panel">
+                <div className="bracket-label">Shared Habit Challenges</div>
+                <div className="info-note" style={{marginBottom:12}}>Purely social \u2014 doesn't touch ORS. Just a shared thermometer and bragging rights.</div>
+                {myActiveChallenges.map(c => {
+                  const optedIn = squadHabitOptIns.filter(o=>o.challengeId===c.id);
+                  const iAmIn = optedIn.some(o=>o.operatorId===activeOp.id);
+                  const windowDays = daysBetween(c.startDate, c.endDate) + 1;
+                  const possible = optedIn.length * windowDays;
+                  const actual = squadHabitCheckins.filter(ch=>ch.challengeId===c.id).length;
+                  const rate = possible > 0 ? (actual/possible)*100 : 0;
+                  const checkedToday = squadHabitCheckins.some(ch=>ch.challengeId===c.id && ch.operatorId===activeOp.id && ch.date===todayStr());
+                  const daysLeft = Math.max(0, daysBetween(todayStr(), c.endDate));
+                  return (
+                    <div key={c.id} style={{marginBottom:16}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{c.name}</div>
+                      {c.description && <div className="dim" style={{fontSize:11,marginTop:2}}>{c.description}</div>}
+                      <div className="dim mono" style={{fontSize:10,marginTop:4}}>{optedIn.length} opted in \u00b7 {daysLeft}d left</div>
+                      <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:Math.min(100,rate)+'%'}}></div></div>
+                      <div style={{fontSize:11,marginTop:4}}>{Math.round(rate)}% collective completion</div>
+                      <div style={{marginTop:8}}>
+                        {!iAmIn ? (
+                          <button className="primary small" onClick={()=>onJoinSquadHabitChallenge(c.id, activeOp.id)}>Join Challenge</button>
+                        ) : (
+                          <button className={checkedToday?'primary small':'ghost small'} disabled={checkedToday} onClick={()=>onCheckinSquadHabitChallenge(c.id, activeOp.id)}>{checkedToday?'Checked In Today':'Check In'}</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {myPastChallenges.length > 0 && (
+              <div className="panel">
+                <div className="bracket-label">Past Challenges</div>
+                {myPastChallenges.map(c => (
+                  <div key={c.id} className="field-row">
+                    <span style={{fontSize:12}}>{c.name}</span>
+                    <span className={c.success?'pill eligible':'pill not-eligible'}>{c.success?'Completed':'Fell Short'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {isLeadership && (
+              <div className="panel">
+                <div className="bracket-label">Propose a Shared Habit Challenge</div>
+                <div className="field"><label>Name</label><input type="text" value={habitChallengeDraft.name} onChange={e=>setHabitChallengeDraft(Object.assign({},habitChallengeDraft,{name:e.target.value}))} placeholder="e.g. Hydration Week" /></div>
+                <div className="field"><label>Description (optional)</label><input type="text" value={habitChallengeDraft.description} onChange={e=>setHabitChallengeDraft(Object.assign({},habitChallengeDraft,{description:e.target.value}))} placeholder="e.g. 64oz of water, every day" /></div>
+                <div className="field"><label>Duration (days)</label><input type="number" value={habitChallengeDraft.durationDays} onChange={e=>setHabitChallengeDraft(Object.assign({},habitChallengeDraft,{durationDays:e.target.value}))} /></div>
+                <button className="primary small" onClick={()=>{
+                  if (!habitChallengeDraft.name.trim() || !habitChallengeDraft.durationDays) return;
+                  onCreateSquadHabitChallenge(mySquad.id, habitChallengeDraft.name.trim(), habitChallengeDraft.description.trim(), Number(habitChallengeDraft.durationDays), activeOp.id);
+                  setHabitChallengeDraft({name:'', description:'', durationDays:'7'});
+                }}>Propose Challenge</button>
               </div>
             )}
           </div>
