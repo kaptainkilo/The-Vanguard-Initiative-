@@ -72,7 +72,7 @@ function chatToRow(m) {
   // Same fix as logToRow — no client-generated id, let Postgres assign a real uuid.
   return { author_id: m.authorId, author_name: m.authorName, is_command: m.isCommand, text: m.text, timestamp: m.timestamp, channel: m.channel || 'main', squad_id: m.squadId || null };
 }
-function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date }; }
+function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date, category: h.category || 'Other' }; }
 function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body, iconRef: c.icon_ref || '' }; }
 function rowToQuip(q) { return { id: q.id, text: q.text }; }
 function rowToChallenge(c) { return { id: c.id, name: c.name, muscleGroup: c.muscle_group, target: Number(c.target), unit: c.unit }; }
@@ -434,4 +434,3 @@ async function fetchAllData() {
 
   return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers };
 }
-
