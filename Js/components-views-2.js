@@ -454,6 +454,24 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
             <div className="disp" style={{fontSize:20}}>{orsData.personalDev === null ? '—' : orsData.personalDev}</div>
             <div className="bar-track" style={{marginTop:6}}><div className="bar-fill" style={{width:(orsData.personalDev||0)+'%'}}></div></div>
             <div style={{fontSize:10,color:'var(--text-dim)',marginTop:4}}>{activeHabitCount>0 ? `${activeHabitCount} active habit(s) tracked` : 'No active habits'}</div>
+            {activeHabitCount > 0 && (
+              <details style={{marginTop:6}}>
+                <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-dim)',fontFamily:"'IBM Plex Mono',monospace"}}>Show the breakdown</summary>
+                <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
+                  {(op.habits||[]).filter(h=>h.active).map(h => {
+                    const habitLogs = logs.filter(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date >= (new Date(Date.now()-orsData.windowDays*86400000)).toISOString().slice(0,10));
+                    const rate = orsData.windowDays > 0 ? Math.round((habitLogs.length/orsData.windowDays)*100) : 0;
+                    const catStyle = habitCategoryStyle(h.category);
+                    return (
+                      <div key={h.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:11}}>
+                        <span><span style={{color:catStyle.color,marginRight:4}}>{catStyle.icon}</span>{h.name}</span>
+                        <span className="mono dim">{Math.min(100,rate)}% this window</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
           <div style={{marginBottom:18}}>
             <div className="field-label" style={{marginBottom:4}}># Squad Contribution</div>
@@ -750,4 +768,3 @@ function Comms({ chat, operators, squads, activeOp, onSend, cheers, onCheer }) {
     </div>
   );
 }
-
