@@ -372,7 +372,7 @@ function App() {
   }
   async function undeploy(op) { await sb.from('profiles').update({current_deployment_id: null}).eq('id', op.id); await refetchAll(); }
   async function claimReinforcement(op) { await sb.from('profiles').update({reinforcement_drops_available: 1, mcp_at_last_reinforcement: nonCampaignMCP(op.id, logs)}).eq('id', op.id); await refetchAll(); }
-  async function addHabit(op, name) { await sb.from('habits').insert({operator_id: op.id, name: name, active: true, created_date: todayStr()}); await refetchAll(); }
+  async function addHabit(op, name, category) { await sb.from('habits').insert({operator_id: op.id, name: name, active: true, created_date: todayStr(), category: category||'Other'}); await refetchAll(); }
   async function toggleHabitArchive(op, habitId) {
     const h = op.habits.find(h=>h.id===habitId);
     await sb.from('habits').update({active: !h.active}).eq('id', habitId);
@@ -605,4 +605,3 @@ function App() {
     </div>
   );
 }
-
