@@ -78,6 +78,13 @@ function rowToQuip(q) { return { id: q.id, text: q.text }; }
 function rowToChallenge(c) { return { id: c.id, name: c.name, muscleGroup: c.muscle_group, target: Number(c.target), unit: c.unit }; }
 function rowToChallengeCompletion(c) { return { id: c.id, operatorId: c.operator_id, date: c.date, poolId: c.pool_id }; }
 function rowToSeason(s) { return { id: s.id, name: s.name, startDate: s.start_date, endDate: s.end_date }; }
+function rowToSquadHabitChallenge(c) {
+  return { id: c.id, squadId: c.squad_id, name: c.name, description: c.description, startDate: c.start_date,
+    endDate: c.end_date, status: c.status, success: c.success, createdBy: c.created_by };
+}
+function rowToSquadHabitOptIn(o) { return { id: o.id, challengeId: o.challenge_id, operatorId: o.operator_id }; }
+function rowToSquadHabitCheckin(c) { return { id: c.id, challengeId: c.challenge_id, operatorId: c.operator_id, date: c.date }; }
+function rowToJoinRequest(r) { return { id: r.id, squadId: r.squad_id, operatorId: r.operator_id, status: r.status, requestedAt: r.requested_at }; }
 function rowToDuel(d) {
   return { id: d.id, challengerSquadId: d.challenger_squad_id, opponentSquadId: d.opponent_squad_id,
     muscleGroup: d.muscle_group, target: Number(d.target), unit: d.unit, durationDays: d.duration_days,
@@ -361,6 +368,16 @@ async function fetchAllData() {
   const { data: cheerRows } = await sb.from('message_cheers').select('*');
   const cheers = (cheerRows||[]).map(rowToCheer);
 
+  const { data: shcRows } = await sb.from('squad_habit_challenges').select('*');
+  let squadHabitChallenges = (shcRows||[]).map(rowToSquadHabitChallenge);
+  const { data: shOptInRows } = await sb.from('squad_habit_opt_ins').select('*');
+  const squadHabitOptIns = (shOptInRows||[]).map(rowToSquadHabitOptIn);
+  const { data: shCheckinRows } = await sb.from('squad_habit_checkins').select('*');
+  const squadHabitCheckins = (shCheckinRows||[]).map(rowToSquadHabitCheckin);
+
+  const { data: joinReqRows } = await sb.from('squad_join_requests').select('*');
+  const joinRequests = (joinReqRows||[]).map(rowToJoinRequest);
+
   // auto-lock join windows / auto-resolve campaigns / auto-detect Control % milestones, writing back any changes
   for (let i = 0; i < camps.length; i++) {
     let c = camps[i];
@@ -432,5 +449,28 @@ async function fetchAllData() {
     }
   }
 
-  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers };
+  // auto-resolve Squad Habit Challenges past their end_date
+  for (let i = 0; i < squadHabitChallenges.length; i++) {
+    const c = squadHabitChallenges[i];
+    if (c.status !== 'active' || todayStr() <= c.endDate) continue;
+    const optedIn = squadHabitOptIns.filter(o => o.challengeId === c.id);
+    const windowDays = daysBetween(c.startDate, c.endDate) + 1;
+    const possible = optedIn.length * windowDays;
+    const actual = squadHabitCheckins.filter(ch => ch.challengeId === c.id).length;
+    const rate = possible > 0 ? actual / possible : 0;
+    const success = rate >= 0.7;
+    await sb.from('squad_habit_challenges').update({ status:'completed', success: success }).eq('id', c.id);
+    squadHabitChallenges[i] = Object.assign({}, c, { status:'completed', success: success });
+    const squad = squads.find(s => s.id === c.squadId);
+    const squadName = squad ? squad.name : 'A squad';
+    if (success) {
+      const grants = optedIn.map(o => ({ operator_id: o.operatorId, award_type: 'squad_habit_'+c.id, title: 'Squad Habit: '+c.name, description: squadName+' completed "'+c.name+'" together \u2014 '+Math.round(rate*100)+'% collective completion.' }));
+      if (grants.length) await sb.from('awards').insert(grants);
+      await sb.rpc('post_command_message', { msg: '\ud83e\udd1d '+squadName+' completed the shared habit challenge "'+c.name+'" \u2014 '+Math.round(rate*100)+'% collective completion. Command noticed.' });
+    } else {
+      await sb.rpc('post_command_message', { msg: squadName+'\u2019s shared habit challenge "'+c.name+'" has ended \u2014 '+Math.round(rate*100)+'% collective completion. Not quite there. Worth trying again.' });
+    }
+  }
+
+  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests };
 }
