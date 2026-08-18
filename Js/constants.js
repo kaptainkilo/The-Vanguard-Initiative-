@@ -1,10 +1,18 @@
-
 const { useState, useEffect, useMemo, useRef } = React;
 
 const AVATAR_COLORS = ['#FFB238','#E4572E','#6FCF97','#7CA9E8','#C98AD1','#F2C94C'];
 const AGE_DIVISIONS = ['Cadet','Corps','Veteran'];
 // Player-selectable specializations. Command and Engineer are NOT in this list —
 // they're conferred titles tied to Admin/Moderator status, not chosen tracks.
+const HABIT_CATEGORIES = [
+  {name:'Nutrition', color:'#8FCB6B', icon:'\ud83c\udf7d\ufe0f'},
+  {name:'Sleep', color:'#7CA9E8', icon:'\ud83d\ude34'},
+  {name:'Mindset', color:'#B57EDC', icon:'\ud83e\udde0'},
+  {name:'Recovery', color:'#4ECDC4', icon:'\ud83e\uddd8'},
+  {name:'Other', color:'#8A9080', icon:'\u2726'},
+];
+function habitCategoryStyle(name) { return HABIT_CATEGORIES.find(c=>c.name===name) || HABIT_CATEGORIES[HABIT_CATEGORIES.length-1]; }
+
 const SPECIALIZATIONS = [
   {name:'Heavy Assault', desc:'Strength and physical capability. Strength, power, load capacity.'},
   {name:'Recon', desc:'Endurance and adaptability. Running, mobility, conditioning.'},
@@ -121,4 +129,3 @@ function matchValFAQ(question) {
   });
   return best ? best.answer : "Val doesn't have a scripted answer for that one. Try asking Command directly, or check the Codex.";
 }
-
