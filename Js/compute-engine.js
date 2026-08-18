@@ -49,10 +49,10 @@ function warProgressLine(wp) {
 // ---------- Val's Weekly Digest ----------
 function weekStartDate() {
   const d = new Date();
-  const day = d.getDay();
+  const day = d.getUTCDay();
   const diff = (day === 0 ? -6 : 1) - day; // shift back to Monday
-  d.setDate(d.getDate() + diff);
-  return todayStr(d);
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d.toISOString().slice(0, 10);
 }
 function composeWeeklyDigest(operators, campaigns, awards, personalRecords, raidInstances, raidTemplates) {
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
@@ -758,6 +758,7 @@ function parseAwardFamily(awardType) {
   if (awardType.startsWith('challenges_')) return { family: 'challenges', tier: Number(awardType.split('_')[1]) };
   if (awardType.startsWith('cheers_given_')) return { family: 'cheers', tier: Number(awardType.split('_')[2]) };
   if (awardType === 'first_campaign' || awardType === 'first_squad' || awardType === 'first_specialization') return { family: 'milestone', tier: null };
+  if (awardType.startsWith('squad_habit_')) return { family: 'squad_habit', tier: null };
   return { family: 'unknown', tier: null };
 }
 const AWARD_FAMILY_STYLES = {
@@ -771,6 +772,7 @@ const AWARD_FAMILY_STYLES = {
   challenges:       { color:'#4ECDC4', secondary:'#1f6a63' },
   cheers:           { color:'#FF6B9D', secondary:'#7a1f47' },
   milestone:        { color:'#E8E6DD', secondary:'#6a6f68' },
+  squad_habit:      { color:'#6BCF9E', secondary:'#2a6b4a' },
   unknown:          { color:'#8A9080', secondary:'#3a3f38' },
 };
 function AwardRibbon({ awardType, size }) {
