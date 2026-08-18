@@ -201,17 +201,30 @@ function Campaigns({ campaigns, activeOp, logs, onDeploy, onUndeploy, onClaimRei
 
 function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
   const [newHabit, setNewHabit] = useState('');
+  const [newHabitCategory, setNewHabitCategory] = useState('Other');
+  const [weekView, setWeekView] = useState('week');
   const habits = op.habits || [];
   const active = habits.filter(h=>h.active);
   const archived = habits.filter(h=>!h.active);
+  // Grace Day: one missed check-in per rolling 7 days preserves the streak
+  // chain (doesn't break it) without adding to the count itself — same
+  // "consistency over perfectionism" principle Rest Days already use.
   function habitStreak(habitId) {
     const days = new Set(logs.filter(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===habitId).map(l=>l.date));
-    let streak = 0; let cursor = new Date();
+    let streak = 0, daysSinceGrace = 99, cursor = new Date(), iterations = 0;
     if (!days.has(todayStr())) cursor.setDate(cursor.getDate()-1);
-    while (days.has(todayStr(cursor))) { streak++; cursor.setDate(cursor.getDate()-1); }
+    while (iterations < 730) {
+      iterations++;
+      const dateStr = todayStr(cursor);
+      if (days.has(dateStr)) { streak++; daysSinceGrace++; }
+      else if (daysSinceGrace >= 7) { daysSinceGrace = 0; }
+      else break;
+      cursor.setDate(cursor.getDate()-1);
+    }
     return streak;
   }
   const last7 = Array.from({length:7}, (_,i) => { const d = new Date(); d.setDate(d.getDate()-(6-i)); return d; });
+  const last30 = Array.from({length:30}, (_,i) => { const d = new Date(); d.setDate(d.getDate()-(29-i)); return d; });
   const dayLetters = ['S','M','T','W','T','F','S'];
   return (
     <div>
@@ -221,9 +234,13 @@ function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
         {active.length === 0 && <div className="empty"><div className="empty-title">No active habits yet.</div></div>}
         {active.map(h => {
           const checkedToday = logs.some(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date===todayStr());
+          const catStyle = habitCategoryStyle(h.category);
           return (
             <div key={h.id} className="field-row">
-              <span>{h.name} <span className="dim mono" style={{fontSize:10}}>({habitStreak(h.id)} day streak)</span></span>
+              <span>
+                <span style={{color:catStyle.color,marginRight:4}} title={h.category}>{catStyle.icon}</span>
+                {h.name} <span className="dim mono" style={{fontSize:10}}>({habitStreak(h.id)} day streak)</span>
+              </span>
               <span style={{display:'flex',gap:8}}>
                 <button className={checkedToday?'primary small':'ghost small'} onClick={()=>onCheckin(op, h.id)} disabled={checkedToday}>{checkedToday?'Done Today':'Check In'}</button>
                 <button className="ghost small" onClick={()=>onToggleArchive(op, h.id)}>Archive</button>
@@ -231,40 +248,71 @@ function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
             </div>
           );
         })}
-        <div style={{display:'flex',gap:8,marginTop:16}}>
-          <input type="text" value={newHabit} onChange={e=>setNewHabit(e.target.value)} placeholder="e.g. Drink 64oz water" style={{flex:1}} />
-          <button className="primary" onClick={()=>{ if(newHabit.trim()){ onAddHabit(op, newHabit.trim()); setNewHabit(''); } }}>Add Habit</button>
+        <div style={{display:'flex',gap:8,marginTop:16,flexWrap:'wrap'}}>
+          <input type="text" value={newHabit} onChange={e=>setNewHabit(e.target.value)} placeholder="e.g. Drink 64oz water" style={{flex:'1 1 180px'}} />
+          <select value={newHabitCategory} onChange={e=>setNewHabitCategory(e.target.value)}>
+            {HABIT_CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
+          </select>
+          <button className="primary" onClick={()=>{ if(newHabit.trim()){ onAddHabit(op, newHabit.trim(), newHabitCategory); setNewHabit(''); setNewHabitCategory('Other'); } }}>Add Habit</button>
         </div>
       </div>
 
       {active.length > 0 && (
         <div className="panel">
-          <div className="bracket-label">This Week</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Habit</th>
-                {last7.map((d,i) => <th key={i} style={{textAlign:'center'}}>{dayLetters[d.getDay()]}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {active.map(h => (
-                <tr key={h.id}>
-                  <td style={{fontSize:11}}>{h.name}</td>
-                  {last7.map((d,i) => {
-                    const dateStr = todayStr(d);
-                    const done = logs.some(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date===dateStr);
-                    const isFuture = dateStr > todayStr();
-                    return (
-                      <td key={i} style={{textAlign:'center'}}>
-                        <div style={{width:16,height:16,borderRadius:3,margin:'0 auto',background: done?'var(--amber)':(isFuture?'transparent':'var(--panel-alt)'),border:'1px solid '+(done?'var(--amber)':'var(--border)')}}></div>
-                      </td>
-                    );
-                  })}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <div className="bracket-label" style={{marginBottom:0}}>{weekView==='week' ? 'This Week' : 'Last 30 Days'}</div>
+            <div className="radio-group">
+              <div className={"radio-opt"+(weekView==='week'?' sel':'')} onClick={()=>setWeekView('week')}>Week</div>
+              <div className={"radio-opt"+(weekView==='month'?' sel':'')} onClick={()=>setWeekView('month')}>Month</div>
+            </div>
+          </div>
+          {weekView === 'week' ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>Habit</th>
+                  {last7.map((d,i) => <th key={i} style={{textAlign:'center'}}>{dayLetters[d.getDay()]}</th>)}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {active.map(h => (
+                  <tr key={h.id}>
+                    <td style={{fontSize:11}}>{h.name}</td>
+                    {last7.map((d,i) => {
+                      const dateStr = todayStr(d);
+                      const done = logs.some(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date===dateStr);
+                      const isFuture = dateStr > todayStr();
+                      return (
+                        <td key={i} style={{textAlign:'center'}}>
+                          <div style={{width:16,height:16,borderRadius:3,margin:'0 auto',background: done?'var(--amber)':(isFuture?'transparent':'var(--panel-alt)'),border:'1px solid '+(done?'var(--amber)':'var(--border)')}}></div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div>
+              <div className="dim" style={{fontSize:11,marginBottom:10}}>Combined completion rate across all active habits, per day. Brighter = more of that day's habits checked in.</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(10, 1fr)',gap:4,maxWidth:340}}>
+                {last30.map((d,i) => {
+                  const dateStr = todayStr(d);
+                  const isFuture = dateStr > todayStr();
+                  const doneCount = active.filter(h=>logs.some(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date===dateStr)).length;
+                  const ratio = active.length > 0 ? doneCount/active.length : 0;
+                  return (
+                    <div key={i} title={dateStr+': '+doneCount+'/'+active.length}
+                      style={{width:'100%',aspectRatio:'1',borderRadius:3,
+                        background: isFuture ? 'transparent' : (ratio===0 ? 'var(--panel-alt)' : 'var(--amber)'),
+                        opacity: isFuture ? 0 : (ratio===0 ? 1 : Math.max(0.25, ratio)),
+                        border:'1px solid var(--border)'}}>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -834,4 +882,3 @@ function personalBest(operatorId, logs, exerciseName) {
   if (prior.length === 0) return null;
   return Math.max.apply(null, prior.map(l=>l.totalValue));
 }
-
