@@ -22,6 +22,10 @@ function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [dismissals, setDismissals] = useState([]);
   const [cheers, setCheers] = useState([]);
+  const [squadHabitChallenges, setSquadHabitChallenges] = useState([]);
+  const [squadHabitOptIns, setSquadHabitOptIns] = useState([]);
+  const [squadHabitCheckins, setSquadHabitCheckins] = useState([]);
+  const [joinRequests, setJoinRequests] = useState([]);
   const [tab, setTab] = useState('command');
   const [showReset, setShowReset] = useState(false);
   const [viewDossierId, setViewDossierId] = useState(null);
@@ -35,7 +39,7 @@ function App() {
   }, []);
 
   async function refetchAll() {
-    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers } = await fetchAllData();
+    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests } = await fetchAllData();
     setOperators(ops); setCampaigns(camps); setLogs(lgs); setChat(ch); setCodexEntries(cx); setSquads(squads);
     setExercises(exercises); setProtocolSessions(protocolSessions); setQuips(quips);
     setAwards(awards); setPersonalRecords(personalRecords);
@@ -46,6 +50,8 @@ function App() {
     setDuels(duels);
     setAnnouncements(announcements); setDismissals(dismissals);
     setCheers(cheers);
+    setJoinRequests(joinRequests);
+    setSquadHabitChallenges(squadHabitChallenges); setSquadHabitOptIns(squadHabitOptIns); setSquadHabitCheckins(squadHabitCheckins);
   }
 
   useEffect(() => {
@@ -323,6 +329,22 @@ function App() {
     }
     await refetchAll();
   }
+  async function createSquadHabitChallenge(squadId, name, description, durationDays, createdBy) {
+    const start = todayStr();
+    const end = new Date(); end.setDate(end.getDate() + Number(durationDays) - 1);
+    await sb.from('squad_habit_challenges').insert({ squad_id: squadId, name: name, description: description||null, start_date: start, end_date: todayStr(end), created_by: createdBy });
+    await refetchAll();
+  }
+  async function joinSquadHabitChallenge(challengeId, operatorId) {
+    if (squadHabitOptIns.some(o=>o.challengeId===challengeId && o.operatorId===operatorId)) return;
+    await sb.from('squad_habit_opt_ins').insert({ challenge_id: challengeId, operator_id: operatorId });
+    await refetchAll();
+  }
+  async function checkinSquadHabitChallenge(challengeId, operatorId) {
+    if (squadHabitCheckins.some(c=>c.challengeId===challengeId && c.operatorId===operatorId && c.date===todayStr())) return;
+    await sb.from('squad_habit_checkins').insert({ challenge_id: challengeId, operator_id: operatorId, date: todayStr() });
+    await refetchAll();
+  }
   // Three simple one-time "first steps" milestones. Each checks a state that's
   // already tracked elsewhere (no new columns needed) and grants once, ever.
   async function checkMilestoneAwards(op, logsSnapshot, existingAwards) {
@@ -406,12 +428,31 @@ function App() {
     await refetchAll();
     return true;
   }
-  async function joinSquad(op, squad) {
+  async function requestJoinSquad(op, squad) {
     if (op.squadId) return false;
     if (squad.members.length >= 10) return false;
-    await sb.from('squad_members').insert({ squad_id: squad.id, operator_id: op.id, role: 'member' });
+    if (joinRequests.some(r => r.squadId===squad.id && r.operatorId===op.id && r.status==='pending')) return false;
+    await sb.from('squad_join_requests').insert({ squad_id: squad.id, operator_id: op.id });
     await refetchAll();
     return true;
+  }
+  async function approveJoinRequest(request) {
+    const squad = squads.find(s=>s.id===request.squadId);
+    const requester = operators.find(o=>o.id===request.operatorId);
+    // Guard against a squad filling up or the requester joining elsewhere
+    // between when they asked and when leadership got to it.
+    if (!squad || squad.members.length >= 10 || (requester && requester.squadId)) {
+      await sb.from('squad_join_requests').update({ status:'denied', decided_at: new Date().toISOString() }).eq('id', request.id);
+      await refetchAll();
+      return;
+    }
+    await sb.from('squad_join_requests').update({ status:'approved', decided_at: new Date().toISOString() }).eq('id', request.id);
+    await sb.from('squad_members').insert({ squad_id: request.squadId, operator_id: request.operatorId, role: 'member' });
+    await refetchAll();
+  }
+  async function denyJoinRequest(requestId) {
+    await sb.from('squad_join_requests').update({ status:'denied', decided_at: new Date().toISOString() }).eq('id', requestId);
+    await refetchAll();
   }
   async function leaveSquad(op) {
     await sb.from('squad_members').delete().eq('operator_id', op.id);
@@ -536,6 +577,9 @@ function App() {
               </div>
             );
           })}
+          <a href="https://ko-fi.com/leidolflokison" target="_blank" rel="noopener noreferrer" className="nav-item" style={{marginTop:20,borderTop:'1px solid var(--border)',opacity:0.75,fontSize:11,textDecoration:'none',display:'block'}}>
+            {'\u2764'} Support the Initiative
+          </a>
         </div>
         <div className="main">
           {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} quips={quips} campaignPOIs={campaignPOIs} challengePool={challengePool} challengeCompletions={challengeCompletions} />}
@@ -545,10 +589,13 @@ function App() {
           {tab==='myprotocols' && <MyProtocols op={op} onSave={saveCustomProtocol} onDelete={deleteCustomProtocol} exercises={exercises} />}
           {tab==='habits' && <Habits op={op} logs={logs} onAddHabit={addHabit} onToggleArchive={toggleHabitArchive} onCheckin={logHabitCheckin} />}
           {tab==='squad' && <SquadTab activeOp={op} operators={operators} squads={squads} logs={logs} campaigns={campaigns}
-            onCreate={createSquad} onJoin={joinSquad} onLeave={leaveSquad} onPromote={promoteOfficer} onDemote={demoteOfficer}
+            onCreate={createSquad} onRequestJoin={requestJoinSquad} onLeave={leaveSquad} onPromote={promoteOfficer} onDemote={demoteOfficer}
             onRemoveMember={removeMember} onRename={renameSquad} onDisband={disbandSquad}
             raidTemplates={raidTemplates} raidInstances={raidInstances} onLaunchRaid={launchRaid} seasons={seasons}
-            duels={duels} onCreateDuel={createDuel} onAcceptDuel={acceptDuel} onDeclineDuel={declineDuel} />}
+            duels={duels} onCreateDuel={createDuel} onAcceptDuel={acceptDuel} onDeclineDuel={declineDuel}
+            squadHabitChallenges={squadHabitChallenges} squadHabitOptIns={squadHabitOptIns} squadHabitCheckins={squadHabitCheckins}
+            onCreateSquadHabitChallenge={createSquadHabitChallenge} onJoinSquadHabitChallenge={joinSquadHabitChallenge} onCheckinSquadHabitChallenge={checkinSquadHabitChallenge}
+            joinRequests={joinRequests} onApproveJoinRequest={approveJoinRequest} onDenyJoinRequest={denyJoinRequest} />}
           {tab==='dossier' && <Dossier op={dossierOp} activeOpId={op.id} operators={operators} campaigns={campaigns} logs={logs} squads={squads} awards={awards} personalRecords={personalRecords} onUpdateOperator={updateOperator} onUploadAvatar={uploadAvatar} />}
           {tab==='roster' && <Roster operators={operators} campaigns={campaigns} logs={logs} onView={(id)=>{setViewDossierId(id); setTab('dossier');}} />}
           {tab==='codex' && <Codex entries={codexEntries} isAdmin={op.isAdmin} onUpdate={updateCodex} />}
