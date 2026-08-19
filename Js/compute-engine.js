@@ -1,4 +1,21 @@
 function todayStr(d) { d = d || new Date(); return d.toISOString().slice(0, 10); }
+// Both fully UTC-based, matching todayStr's basis — avoids the exact
+// local-time/UTC mismatch bug found and fixed in weekStartDate() earlier.
+function computeAge(birthdate, asOfStr) {
+  if (!birthdate) return null;
+  const bd = new Date(birthdate);
+  const asOf = new Date(asOfStr || todayStr());
+  let age = asOf.getUTCFullYear() - bd.getUTCFullYear();
+  const monthDiff = asOf.getUTCMonth() - bd.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && asOf.getUTCDate() < bd.getUTCDate())) age--;
+  return age;
+}
+function computeAgeDivision(age) {
+  if (age === null || age === undefined) return null;
+  if (age < 17) return 'Cadet'; // covers the 10-16 range; anyone younger than 10 defaults to Cadet too, not addressed separately
+  if (age < 50) return 'Corps';
+  return 'Veteran';
+}
 function daysAgoStr(n) { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); }
 function daysBetween(a, b) { return Math.floor((new Date(b) - new Date(a)) / 86400000); }
 function findLocationForCategory(camp, category) {
@@ -748,6 +765,12 @@ const SPECIALTY_ICONS = {
 // cleanly without needing a distinct icon per possible tier.
 function parseAwardFamily(awardType) {
   if (!awardType) return { family: 'unknown', tier: null };
+  // Veteran ladders (cumulative win counts) checked BEFORE the generic
+  // per-event prefixes below, since e.g. "campaign_veteran_5" would
+  // otherwise match "campaign_" first and lose its tier number.
+  if (awardType.startsWith('campaign_veteran_')) return { family: 'campaign', tier: Number(awardType.split('_')[2]) };
+  if (awardType.startsWith('raid_veteran_')) return { family: 'raid', tier: Number(awardType.split('_')[2]) };
+  if (awardType.startsWith('duel_veteran_')) return { family: 'duel', tier: Number(awardType.split('_')[2]) };
   if (awardType.startsWith('rank_')) return { family: 'rank', tier: null };
   if (awardType.startsWith('campaign_')) return { family: 'campaign', tier: null };
   if (awardType.startsWith('raid_')) return { family: 'raid', tier: null };
@@ -757,8 +780,13 @@ function parseAwardFamily(awardType) {
   if (awardType.startsWith('service_strip_')) return { family: 'service_strip', tier: Number(awardType.split('_')[2]) };
   if (awardType.startsWith('challenges_')) return { family: 'challenges', tier: Number(awardType.split('_')[1]) };
   if (awardType.startsWith('cheers_given_')) return { family: 'cheers', tier: Number(awardType.split('_')[2]) };
-  if (awardType === 'first_campaign' || awardType === 'first_squad' || awardType === 'first_specialization') return { family: 'milestone', tier: null };
+  if (awardType === 'first_campaign' || awardType === 'first_squad' || awardType === 'first_specialization' || awardType === 'orientation_complete') return { family: 'milestone', tier: null };
   if (awardType.startsWith('squad_habit_')) return { family: 'squad_habit', tier: null };
+  if (awardType.startsWith('comeback_')) return { family: 'comeback', tier: Number(awardType.split('_')[1]) };
+  if (awardType === 'took_command') return { family: 'command', tier: null };
+  if (awardType === 'retested_baseline') return { family: 'baseline', tier: null };
+  if (awardType === 'founding_operator') return { family: 'founding', tier: null };
+  if (awardType.startsWith('rest_days_')) return { family: 'rest', tier: Number(awardType.split('_')[2]) };
   return { family: 'unknown', tier: null };
 }
 const AWARD_FAMILY_STYLES = {
@@ -773,6 +801,11 @@ const AWARD_FAMILY_STYLES = {
   cheers:           { color:'#FF6B9D', secondary:'#7a1f47' },
   milestone:        { color:'#E8E6DD', secondary:'#6a6f68' },
   squad_habit:      { color:'#6BCF9E', secondary:'#2a6b4a' },
+  comeback:         { color:'#F2A649', secondary:'#7a4f1f' },
+  command:          { color:'#D4AF37', secondary:'#6b5518' },
+  baseline:         { color:'#7CA9E8', secondary:'#2a4a7a' },
+  founding:         { color:'#B57EDC', secondary:'#4a2a6b' },
+  rest:             { color:'#8FD3D8', secondary:'#2a5c60' },
   unknown:          { color:'#8A9080', secondary:'#3a3f38' },
 };
 function AwardRibbon({ awardType, size }) {
