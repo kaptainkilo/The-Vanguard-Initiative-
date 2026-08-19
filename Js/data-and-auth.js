@@ -11,7 +11,8 @@ function rowToOperator(p, habits) {
     reinforcementDropsAvailable: p.reinforcement_drops_available, mcpAtLastReinforcement: p.mcp_at_last_reinforcement,
     lastSeenRank: p.last_seen_rank, customProtocols: p.custom_protocols || [], habits: habits || [],
     adminSince: p.admin_since || null, moderatorSince: p.moderator_since || null,
-    featuredAwardId: p.featured_award_id || null,
+    featuredAwardId: p.featured_award_id || null, lastSeenStatus: p.last_seen_status || null,
+    birthdate: p.birthdate || null, hidePersonalInfo: p.hide_personal_info !== false,
   };
 }
 const OP_FIELD_MAP = { realName:'real_name', ageDivision:'age_division', specialization:'specialization', squad:'squad',
@@ -19,7 +20,8 @@ const OP_FIELD_MAP = { realName:'real_name', ageDivision:'age_division', special
   baseline:'baseline', previousBaseline:'previous_baseline', currentDeploymentId:'current_deployment_id',
   reinforcementDropsAvailable:'reinforcement_drops_available', mcpAtLastReinforcement:'mcp_at_last_reinforcement',
   lastSeenRank:'last_seen_rank', customProtocols:'custom_protocols', callsign:'callsign',
-  adminSince:'admin_since', moderatorSince:'moderator_since', featuredAwardId:'featured_award_id' };
+  adminSince:'admin_since', moderatorSince:'moderator_since', featuredAwardId:'featured_award_id', lastSeenStatus:'last_seen_status',
+  birthdate:'birthdate', hidePersonalInfo:'hide_personal_info' };
 function operatorToRowPatch(patch) {
   const row = {};
   Object.keys(patch).forEach(k => { if (OP_FIELD_MAP[k]) row[OP_FIELD_MAP[k]] = patch[k]; });
@@ -34,12 +36,14 @@ function rowToCampaign(c, locs) {
     lockedTargets: c.locked_targets, lockedDeployedCount: c.locked_deployed_count,
     deployedOperatorIds: c.deployed_operator_ids || [], reinforcementsUsed: c.reinforcements_used,
     resolved: c.resolved, resolvedAt: c.resolved_at || null, lore: c.lore || '', lastMilestoneNotified: c.last_milestone_notified || 0,
+    planetId: c.planet_id || null,
     locations: (locs||[]).map(rowToLocation) };
 }
 const CAMP_FIELD_MAP = { name:'name', threat:'threat', sector:'sector', joinWindowDays:'join_window_days',
   durationDays:'duration_days', lockedAt:'locked_at', lockedTargets:'locked_targets',
   lockedDeployedCount:'locked_deployed_count', deployedOperatorIds:'deployed_operator_ids',
-  reinforcementsUsed:'reinforcements_used', resolved:'resolved', lore:'lore', lastMilestoneNotified:'last_milestone_notified' };
+  reinforcementsUsed:'reinforcements_used', resolved:'resolved', lore:'lore', lastMilestoneNotified:'last_milestone_notified',
+  planetId:'planet_id' };
 function campaignToRowPatch(patch) {
   const row = {};
   Object.keys(patch).forEach(k => { if (CAMP_FIELD_MAP[k]) row[CAMP_FIELD_MAP[k]] = patch[k]; });
@@ -85,6 +89,13 @@ function rowToSquadHabitChallenge(c) {
 function rowToSquadHabitOptIn(o) { return { id: o.id, challengeId: o.challenge_id, operatorId: o.operator_id }; }
 function rowToSquadHabitCheckin(c) { return { id: c.id, challengeId: c.challenge_id, operatorId: c.operator_id, date: c.date }; }
 function rowToJoinRequest(r) { return { id: r.id, squadId: r.squad_id, operatorId: r.operator_id, status: r.status, requestedAt: r.requested_at }; }
+function rowToQuadrant(q) { return { id: q.id, name: q.name, gridPosition: q.grid_position }; }
+function rowToSector(s) { return { id: s.id, quadrantId: s.quadrant_id, sectorNumber: s.sector_number, code: s.code, name: s.name, description: s.description, known: s.known }; }
+function rowToSystem(s) { return { id: s.id, sectorId: s.sector_id, name: s.name, starName: s.star_name, starDescription: s.star_description }; }
+function rowToPlanet(p) { return { id: p.id, systemId: p.system_id, name: p.name, description: p.description, orderIndex: p.order_index }; }
+function rowToMoon(m) { return { id: m.id, planetId: m.planet_id, name: m.name, description: m.description }; }
+function rowToAsteroidBelt(a) { return { id: a.id, systemId: a.system_id, name: a.name, description: a.description }; }
+function rowToDeepVoidFeature(d) { return { id: d.id, sectorId: d.sector_id, featureType: d.feature_type, name: d.name, description: d.description }; }
 function rowToDuel(d) {
   return { id: d.id, challengerSquadId: d.challenger_squad_id, opponentSquadId: d.opponent_squad_id,
     muscleGroup: d.muscle_group, target: Number(d.target), unit: d.unit, durationDays: d.duration_days,
@@ -195,20 +206,54 @@ function Login({ onAuthed }) {
 
 function Onboarding({ op, onComplete }) {
   const [step, setStep] = useState('oath');
+  const [birthdate, setBirthdate] = useState('');
   const [pushups, setPushups] = useState('');
   const [pullups, setPullups] = useState('');
   const [squats, setSquats] = useState('');
   const [plank, setPlank] = useState('');
   const [runMinutes, setRunMinutes] = useState('');
+  const [pendingBaseline, setPendingBaseline] = useState(null);
+  // Three age-scaled threshold sets — Corps values are the original,
+  // unchanged adult standards; Cadet and Veteran are deliberately gentler,
+  // reasonable estimates rather than clinically validated youth/senior
+  // fitness benchmarks. Each array is [4pt-min, 3pt-min, 2pt-min, 1pt-min]
+  // for rep-based categories (higher is better), or [4pt-max, 3pt-max,
+  // 2pt-max] for run time (lower is better).
+  const BASELINE_TIERS = {
+    Cadet:   { pushups:[20,12,5,1], pullups:[6,3,1,0], plank:[90,60,30,1],  run:[12,14,17] },
+    Corps:   { pushups:[41,26,11,1], pullups:[13,8,3,0], plank:[180,120,60,1], run:[10,12,15] },
+    Veteran: { pushups:[25,15,6,1], pullups:[8,5,2,0], plank:[120,80,40,1], run:[11,13,16] },
+  };
+  function scoreRep(value, t) {
+    if (value >= t[0]) return 4;
+    if (value >= t[1]) return 3;
+    if (value >= t[2]) return 2;
+    if (value >= t[3]) return 1;
+    return 0;
+  }
+  function scoreRunTime(minutes, t) {
+    if (minutes <= 0) return 0; // optional field, not attempted
+    if (minutes < t[0]) return 4;
+    if (minutes < t[1]) return 3;
+    if (minutes <= t[2]) return 2;
+    return 1;
+  }
   function finishAssessment() {
-    const pu = parseFloat(pushups)||0, pl = parseFloat(pullups)||0, sq = parseFloat(squats)||0, pk = parseFloat(plank)||0;
+    const pu = parseFloat(pushups)||0, pl = parseFloat(pullups)||0, sq = parseFloat(squats)||0, pk = parseFloat(plank)||0, rn = parseFloat(runMinutes)||0;
+    const division = computeAgeDivision(computeAge(birthdate)) || 'Corps';
+    const tiers = BASELINE_TIERS[division] || BASELINE_TIERS.Corps;
     let pts = 0;
-    pts += pu>=41?4:pu>=26?3:pu>=11?2:pu>=1?1:0;
-    pts += pl>=13?4:pl>=8?3:pl>=3?2:pl>=0?1:0;
-    pts += pk>=180?4:pk>=120?3:pk>=60?2:pk>0?1:0;
+    pts += scoreRep(pu, tiers.pushups);
+    pts += scoreRep(pl, tiers.pullups);
+    pts += scoreRep(pk, tiers.plank);
+    pts += scoreRunTime(rn, tiers.run);
     let tier = pts>=15?'Peak Tier':pts>=12?'Advanced Tier':pts>=8?'Development Tier':'Foundation Tier';
-    onComplete(Object.assign({}, op, { onboarded: true,
-      baseline: { pushups: pu, pullups: pl, squats: sq, plankSeconds: pk, runMinutes: parseFloat(runMinutes)||0, score: pts, tier: tier, date: todayStr() } }));
+    setPendingBaseline({ pushups: pu, pullups: pl, squats: sq, plankSeconds: pk, runMinutes: rn, score: pts, tier: tier, date: todayStr() });
+    setStep('walkthrough');
+  }
+  function finishOnboarding() {
+    const division = computeAgeDivision(computeAge(birthdate)) || 'Corps';
+    onComplete(Object.assign({}, op, { onboarded: true, baseline: pendingBaseline, birthdate: birthdate || null, ageDivision: division }));
   }
   if (step === 'oath') {
     return (
@@ -236,24 +281,45 @@ function Onboarding({ op, onComplete }) {
               I need to be one Command can count on.<br/>
               This is the Vanguard Oath. I accept it.
             </div>
-            <button className="primary" style={{width:'100%'}} onClick={()=>setStep('assessment')}>[ I ACCEPT ]</button>
+            <div className="field"><label>Date of Birth (used to calibrate your Baseline Assessment fairly for your age)</label><input type="date" value={birthdate} onChange={e=>setBirthdate(e.target.value)} /></div>
+            <button className="primary" style={{width:'100%'}} disabled={!birthdate} onClick={()=>setStep('assessment')}>[ I ACCEPT ]</button>
           </div>
         </div>
       </div>
     );
   }
+  if (step === 'assessment') {
+    return (
+      <div className="login-wrap">
+        <div className="login-card" style={{maxWidth:480}}>
+          <div className="panel">
+            <div className="bracket-label">Baseline Assessment</div>
+            <div className="dim" style={{fontSize:12,marginBottom:16}}>Record your current starting point, {op.callsign}.</div>
+            <div className="field"><label>Max Push-Ups</label><input type="number" value={pushups} onChange={e=>setPushups(e.target.value)} /></div>
+            <div className="field"><label>Max Pull-Ups</label><input type="number" value={pullups} onChange={e=>setPullups(e.target.value)} /></div>
+            <div className="field"><label>Bodyweight Squats in 2 Minutes</label><input type="number" value={squats} onChange={e=>setSquats(e.target.value)} /></div>
+            <div className="field"><label>Plank Hold (seconds)</label><input type="number" value={plank} onChange={e=>setPlank(e.target.value)} /></div>
+            <div className="field"><label>1.5 Mile Run Time (minutes, optional)</label><input type="number" value={runMinutes} onChange={e=>setRunMinutes(e.target.value)} /></div>
+            <button className="primary" style={{width:'100%'}} onClick={finishAssessment}>Complete Assessment</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // Brief, not exhaustive — deeper detail lives in the Codex Field Guide and
+  // Val's @Val FAQ, both available anytime once activated.
   return (
     <div className="login-wrap">
-      <div className="login-card" style={{maxWidth:480}}>
+      <div className="login-card" style={{maxWidth:560}}>
         <div className="panel">
-          <div className="bracket-label">Baseline Assessment</div>
-          <div className="dim" style={{fontSize:12,marginBottom:16}}>Record your current starting point, {op.callsign}.</div>
-          <div className="field"><label>Max Push-Ups</label><input type="number" value={pushups} onChange={e=>setPushups(e.target.value)} /></div>
-          <div className="field"><label>Max Pull-Ups</label><input type="number" value={pullups} onChange={e=>setPullups(e.target.value)} /></div>
-          <div className="field"><label>Bodyweight Squats in 2 Minutes</label><input type="number" value={squats} onChange={e=>setSquats(e.target.value)} /></div>
-          <div className="field"><label>Plank Hold (seconds)</label><input type="number" value={plank} onChange={e=>setPlank(e.target.value)} /></div>
-          <div className="field"><label>1.5 Mile Run Time (minutes, optional)</label><input type="number" value={runMinutes} onChange={e=>setRunMinutes(e.target.value)} /></div>
-          <button className="primary" style={{width:'100%'}} onClick={finishAssessment}>Complete Assessment — Activate Recruit Status</button>
+          <div className="bracket-label">Orientation — How This Works</div>
+          <div style={{fontSize:12,lineHeight:1.9,color:'var(--text-dim)'}}>
+            <strong style={{color:'var(--text)'}}>Log your training.</strong> Every workout you record is an After Action Report — Command calls it an AAR. Structured Sessions, freeform exercises, even Rest Days all count.<br/><br/>
+            <strong style={{color:'var(--text)'}}>ORS drives everything.</strong> Your Operational Readiness Score blends your training, consistency, personal habits, and squad activity. ORS is what actually promotes you — not just showing up once.<br/><br/>
+            <strong style={{color:'var(--text)'}}>Deploy when you're ready.</strong> Campaigns, Squads, Raids, and Duels are all there once you want them — none of them are required to make progress on your own.<br/><br/>
+            <strong style={{color:'var(--text)'}}>Stuck on something?</strong> The Codex has a full Field Guide covering ranks, specializations, and awards. Or just type <span className="amber mono">@Val</span> in Main chat with a question — Command's AI will answer directly.
+          </div>
+          <button className="primary" style={{width:'100%',marginTop:20}} onClick={finishOnboarding}>[ ENTER THE VANGUARD INITIATIVE ]</button>
         </div>
       </div>
     </div>
@@ -378,6 +444,21 @@ async function fetchAllData() {
   const { data: joinReqRows } = await sb.from('squad_join_requests').select('*');
   const joinRequests = (joinReqRows||[]).map(rowToJoinRequest);
 
+  const { data: quadrantRows } = await sb.from('quadrants').select('*');
+  const quadrants = (quadrantRows||[]).map(rowToQuadrant);
+  const { data: sectorRows } = await sb.from('sectors').select('*');
+  const sectors = (sectorRows||[]).map(rowToSector);
+  const { data: systemRows } = await sb.from('systems').select('*');
+  const systems = (systemRows||[]).map(rowToSystem);
+  const { data: planetRows } = await sb.from('planets').select('*');
+  const planets = (planetRows||[]).map(rowToPlanet);
+  const { data: moonRows } = await sb.from('moons').select('*');
+  const moons = (moonRows||[]).map(rowToMoon);
+  const { data: beltRows } = await sb.from('asteroid_belts').select('*');
+  const asteroidBelts = (beltRows||[]).map(rowToAsteroidBelt);
+  const { data: voidRows } = await sb.from('deep_void_features').select('*');
+  const deepVoidFeatures = (voidRows||[]).map(rowToDeepVoidFeature);
+
   // auto-lock join windows / auto-resolve campaigns / auto-detect Control % milestones, writing back any changes
   for (let i = 0; i < camps.length; i++) {
     let c = camps[i];
@@ -472,5 +553,6 @@ async function fetchAllData() {
     }
   }
 
-  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests };
+  return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests, quadrants, sectors, systems, planets, moons, asteroidBelts, deepVoidFeatures };
 }
+
