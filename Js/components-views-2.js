@@ -346,7 +346,7 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns, exe
 
       {mode === 'rest' && (
         <div>
-          <div className="info-note" style={{marginBottom:12}}>Recovery is part of the training system, not a break from it. Logging a Rest Day keeps your readiness rate honest without counting as a training session \u2014 it won't contribute to ORS Physical Capability, MCP, or any Campaign/Raid/Duel progress.</div>
+          <div className="info-note" style={{marginBottom:12}}>Recovery is part of the training system, not a break from it. Logging a Rest Day keeps your readiness rate honest without counting as a training session {'\u2014'} it won't contribute to ORS Physical Capability, MCP, or any Campaign/Raid/Duel progress.</div>
           <div className="field"><label>Note (optional)</label><input type="text" value={restNote} onChange={e=>setRestNote(e.target.value)} placeholder="e.g. planned deload, feeling beat up, life got in the way..." /></div>
           <button className="primary" disabled={restBusy} onClick={submitRestDay}>{restBusy ? 'Logging...' : 'Log Rest Day'}</button>
         </div>
@@ -357,13 +357,19 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns, exe
   );
 }
 
-function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, personalRecords, onUpdateOperator, onUploadAvatar }) {
+function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, personalRecords, onUpdateOperator, onUploadAvatar, onSetBirthdate }) {
   const [pickingSpec, setPickingSpec] = useState(false);
   const [retesting, setRetesting] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState('');
+  const [birthdateDraft, setBirthdateDraft] = useState('');
+  const [realNameDraft, setRealNameDraft] = useState(op ? (op.realName||'') : '');
+  useEffect(() => { if (op) setRealNameDraft(op.realName||''); }, [op && op.id]);
   if (!op) return null;
   const isOwnProfile = activeOpId === op.id;
+  const viewer = operators.find(o=>o.id===activeOpId);
+  const viewerIsAdmin = viewer ? !!viewer.isAdmin : false;
+  const shouldHidePersonalInfo = op.hidePersonalInfo!==false && !isOwnProfile && !viewerIsAdmin;
   const orsData = computeORS(op.id, op, logs);
   const status = computeReadinessStatus(op.id, logs);
   const deployedCampaign = op.currentDeploymentId ? campaigns.find(c => c.id === op.currentDeploymentId) : null;
@@ -486,10 +492,42 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
 
         <div>
           <div className="field-row"><span className="field-label">Status</span><span className={"status-pill "+status.cls}>{status.label}</span></div>
-          <div className="field-row"><span className="field-label">Name</span><span>{op.realName || '\u2014'}</span></div>
+          {isOwnProfile ? (
+            <div className="field-row">
+              <span className="field-label">Name</span>
+              <span style={{display:'flex',gap:6,alignItems:'center'}}>
+                <input type="text" value={realNameDraft} onChange={e=>setRealNameDraft(e.target.value)} placeholder="Optional" style={{fontSize:12}} />
+                {realNameDraft !== (op.realName||'') && <button className="ghost small" onClick={()=>onUpdateOperator(Object.assign({},op,{realName:realNameDraft}))}>Save</button>}
+              </span>
+            </div>
+          ) : (
+            <div className="field-row"><span className="field-label">Name</span><span>{shouldHidePersonalInfo ? '\u2014 Redacted \u2014' : (op.realName || '\u2014')}</span></div>
+          )}
           <div className="field-row"><span className="field-label">ID</span><span className="mono">{op.idNum}</span></div>
           <div className="field-row"><span className="field-label">Join Date</span><span>{op.joinDate}</span></div>
-          <div className="field-row"><span className="field-label">Age Division</span><span className="pill">{op.ageDivision}</span></div>
+          <div className="field-row"><span className="field-label">Age Division</span><span className="pill">{shouldHidePersonalInfo ? '\u2014 Redacted \u2014' : op.ageDivision}</span></div>
+          {isOwnProfile && (
+            <div className="field-row">
+              <span className="field-label">Hide Name & Age from Others</span>
+              <span style={{display:'flex',alignItems:'center',gap:8}}>
+                <input type="checkbox" checked={op.hidePersonalInfo!==false} disabled={op.ageDivision==='Cadet'} onChange={e=>onUpdateOperator(Object.assign({},op,{hidePersonalInfo:e.target.checked}))} style={{width:14,height:14}} />
+                {op.ageDivision==='Cadet' && <span className="dim" style={{fontSize:10}}>Locked on for Cadets</span>}
+              </span>
+            </div>
+          )}
+          {isOwnProfile && (
+            op.birthdate ? (
+              <div className="field-row"><span className="field-label">Birthdate</span><span className="dim mono" style={{fontSize:11}}>{op.birthdate} {'\u2014'} on file, contact Command to correct</span></div>
+            ) : (
+              <div className="field-row">
+                <span className="field-label">Birthdate</span>
+                <span style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <input type="date" value={birthdateDraft} onChange={e=>setBirthdateDraft(e.target.value)} style={{fontSize:11}} />
+                  <button className="ghost small" onClick={()=>{ if(birthdateDraft) onSetBirthdate(op.id, birthdateDraft); }}>Set (one-time)</button>
+                </span>
+              </div>
+            )
+          )}
           <div className="field-row"><span className="field-label">Rank</span><span className="pill rank">{commandRank ? commandRankDisplay(commandRank) : rankDisplay(rank, rankTier)}</span></div>
           <div className="field-row">
             <span className="field-label">Specialization</span>
@@ -768,3 +806,4 @@ function Comms({ chat, operators, squads, activeOp, onSend, cheers, onCheer }) {
     </div>
   );
 }
+
