@@ -26,6 +26,13 @@ function App() {
   const [squadHabitOptIns, setSquadHabitOptIns] = useState([]);
   const [squadHabitCheckins, setSquadHabitCheckins] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
+  const [quadrants, setQuadrants] = useState([]);
+  const [sectors, setSectors] = useState([]);
+  const [systems, setSystems] = useState([]);
+  const [planets, setPlanets] = useState([]);
+  const [moons, setMoons] = useState([]);
+  const [asteroidBelts, setAsteroidBelts] = useState([]);
+  const [deepVoidFeatures, setDeepVoidFeatures] = useState([]);
   const [tab, setTab] = useState('command');
   const [showReset, setShowReset] = useState(false);
   const [viewDossierId, setViewDossierId] = useState(null);
@@ -39,7 +46,7 @@ function App() {
   }, []);
 
   async function refetchAll() {
-    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests } = await fetchAllData();
+    const { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests, quadrants, sectors, systems, planets, moons, asteroidBelts, deepVoidFeatures } = await fetchAllData();
     setOperators(ops); setCampaigns(camps); setLogs(lgs); setChat(ch); setCodexEntries(cx); setSquads(squads);
     setExercises(exercises); setProtocolSessions(protocolSessions); setQuips(quips);
     setAwards(awards); setPersonalRecords(personalRecords);
@@ -52,6 +59,8 @@ function App() {
     setCheers(cheers);
     setJoinRequests(joinRequests);
     setSquadHabitChallenges(squadHabitChallenges); setSquadHabitOptIns(squadHabitOptIns); setSquadHabitCheckins(squadHabitCheckins);
+    setQuadrants(quadrants); setSectors(sectors); setSystems(systems); setPlanets(planets);
+    setMoons(moons); setAsteroidBelts(asteroidBelts); setDeepVoidFeatures(deepVoidFeatures);
   }
 
   useEffect(() => {
@@ -115,7 +124,7 @@ function App() {
       if (!old) {
         const { data: inserted } = await sb.from('campaigns').insert({
           name: nc.name, threat: nc.threat, sector: nc.sector, start_date: nc.startDate,
-          join_window_days: nc.joinWindowDays, duration_days: nc.durationDays,
+          join_window_days: nc.joinWindowDays, duration_days: nc.durationDays, planet_id: nc.planetId || null,
         }).select().single();
         if (inserted && nc.locations.length) {
           await sb.from('locations').insert(nc.locations.map(l => ({ campaign_id: inserted.id, name:l.name, objective:l.objective, category:l.category, unit:l.unit, manual_target:l.manualTarget, briefing:l.briefing||null })));
@@ -349,7 +358,9 @@ function App() {
   // already tracked elsewhere (no new columns needed) and grants once, ever.
   async function checkMilestoneAwards(op, logsSnapshot, existingAwards) {
     const grants = [];
-    if (logsSnapshot.some(l=>l.operatorId===op.id && l.type==='campaign') && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_campaign')) {
+    const loggedFirst = logsSnapshot.some(l=>l.operatorId===op.id);
+    const loggedCampaign = logsSnapshot.some(l=>l.operatorId===op.id && l.type==='campaign');
+    if (loggedCampaign && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_campaign')) {
       grants.push({ operator_id: op.id, award_type: 'first_campaign', title: 'First Deployment', description: 'Your first logged Campaign contribution. Command has your file open now.' });
     }
     if (op.squadId && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_squad')) {
@@ -358,7 +369,88 @@ function App() {
     if (op.specialization && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='first_specialization')) {
       grants.push({ operator_id: op.id, award_type: 'first_specialization', title: 'Chosen Path', description: 'Selected a Specialization: '+op.specialization+'.' });
     }
+    const orientationDone = loggedFirst && (op.habits||[]).length>0 && loggedCampaign && !!op.squadId && !!op.specialization;
+    if (orientationDone && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='orientation_complete')) {
+      grants.push({ operator_id: op.id, award_type: 'orientation_complete', title: 'Orientation Complete', description: 'Completed every step of the Orientation Checklist. You know how this works now.' });
+    }
     if (grants.length) await sb.from('awards').insert(grants);
+  }
+  async function checkVeteranAwards(op, existingAwards) {
+    const families = [
+      { prefix: 'campaign_', veteranPrefix: 'campaign_veteran_', label: 'Campaigns Won', tiers: [3,5,10] },
+      { prefix: 'raid_', veteranPrefix: 'raid_veteran_', label: 'Raids Cleared', tiers: [3,5,10] },
+      { prefix: 'duel_', veteranPrefix: 'duel_veteran_', label: 'Duels Won', tiers: [3,5,10] },
+    ];
+    for (const fam of families) {
+      const count = existingAwards.filter(a=>a.operatorId===op.id && a.awardType.startsWith(fam.prefix) && !a.awardType.startsWith(fam.veteranPrefix)).length;
+      for (const tier of fam.tiers) {
+        if (count < tier) continue;
+        const type = fam.veteranPrefix+tier;
+        if (!existingAwards.some(a=>a.operatorId===op.id && a.awardType===type)) {
+          await sb.from('awards').insert({ operator_id: op.id, award_type: type, title: tier+' '+fam.label, description: 'Reached '+tier+' '+fam.label.toLowerCase()+'. Command has stopped being surprised.' });
+        }
+      }
+    }
+  }
+  async function checkComebackAward(op, currentStatusLabel, existingAwards) {
+    const badStatuses = ['Reserve','Deep Reserve'];
+    if (op.lastSeenStatus && badStatuses.includes(op.lastSeenStatus) && currentStatusLabel === 'Active') {
+      const existingComebacks = existingAwards.filter(a=>a.operatorId===op.id && a.awardType.startsWith('comeback_')).length;
+      const type = 'comeback_'+(existingComebacks+1);
+      await sb.from('awards').insert({ operator_id: op.id, award_type: type, title: 'The Comeback', description: 'Returned to Active status after '+op.lastSeenStatus+'. That takes more discipline than never falling behind at all.' });
+    }
+    if (op.lastSeenStatus !== currentStatusLabel) {
+      await sb.from('profiles').update({ last_seen_status: currentStatusLabel }).eq('id', op.id);
+    }
+  }
+  async function checkTookCommand(op, existingAwards) {
+    if ((op.squadRole === 'leader' || op.squadRole === 'officer') && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='took_command')) {
+      await sb.from('awards').insert({ operator_id: op.id, award_type: 'took_command', title: 'Took Command', description: 'Stepped into Squad leadership for the first time.' });
+    }
+  }
+  async function checkRetestedBaseline(op, existingAwards) {
+    if (op.previousBaseline && !existingAwards.some(a=>a.operatorId===op.id && a.awardType==='retested_baseline')) {
+      await sb.from('awards').insert({ operator_id: op.id, award_type: 'retested_baseline', title: 'Progress, Verified', description: 'Retested your Baseline Assessment \u2014 tracking real change over time, not just guessing at it.' });
+    }
+  }
+  async function checkAgeDivision(op) {
+    if (!op.birthdate) return;
+    const correctDivision = computeAgeDivision(computeAge(op.birthdate));
+    if (correctDivision && correctDivision !== op.ageDivision) {
+      await sb.from('profiles').update({ age_division: correctDivision }).eq('id', op.id);
+    }
+  }
+  async function setBirthdateOnce(operatorId, birthdate) {
+    // Set-once from the non-admin path — only writes if nothing is on file
+    // yet. Once set, only the Admin Panel's roster editor can change it.
+    const current = operators.find(o=>o.id===operatorId);
+    if (current && current.birthdate) return;
+    const division = computeAgeDivision(computeAge(birthdate));
+    await sb.from('profiles').update({ birthdate: birthdate, age_division: division || 'Corps' }).eq('id', operatorId);
+    await refetchAll();
+  }
+  async function updateBirthdateAdmin(operatorId, birthdate) {
+    // Admin can always set/override, for any operator — recomputes division
+    // immediately rather than waiting for that operator's own next login to
+    // self-correct via checkAgeDivision.
+    const division = birthdate ? computeAgeDivision(computeAge(birthdate)) : null;
+    await sb.from('profiles').update({ birthdate: birthdate || null, age_division: division || 'Corps' }).eq('id', operatorId);
+    await refetchAll();
+  }
+  async function checkRestDayMilestones(op, logsSnapshot, existingAwards) {
+    const count = logsSnapshot.filter(l=>l.operatorId===op.id && l.type==='rest').length;
+    const tiers = [5,10,25,50];
+    for (const tier of tiers) {
+      if (count < tier) continue;
+      const type = 'rest_days_'+tier;
+      if (!existingAwards.some(a=>a.operatorId===op.id && a.awardType===type)) {
+        await sb.from('awards').insert({ operator_id: op.id, award_type: type, title: tier+' Rest Days Logged', description: 'Recovery is part of the mission. '+tier+' Rest Days logged \u2014 not skipped, not ignored. Logged.' });
+      }
+    }
+  }
+  async function grantManualAward(operatorId, title, description, awardType) {
+    await sb.from('awards').insert({ operator_id: operatorId, award_type: awardType || ('manual_'+Date.now()), title: title, description: description||null });
+    await refetchAll();
   }
   async function saveAnnouncement(announcement) {
     const exists = announcements.some(a=>a.id===announcement.id);
@@ -509,7 +601,13 @@ function App() {
     checkServiceStripAward(op, logs, campaigns, awards);
     checkChallengeCompletion(op, challengePool, challengeCompletions, logs, awards);
     checkMilestoneAwards(op, logs, awards);
-  }, [streakTop, todayLogCountTop, loaded, opOnboarded, op && op.squadId, op && op.specialization]);
+    checkVeteranAwards(op, awards);
+    checkComebackAward(op, statusTop ? statusTop.label : null, awards);
+    checkTookCommand(op, awards);
+    checkRetestedBaseline(op, awards);
+    checkRestDayMilestones(op, logs, awards);
+    checkAgeDivision(op);
+  }, [streakTop, todayLogCountTop, loaded, opOnboarded, op && op.squadId, op && op.specialization, op && op.squadRole, op && op.previousBaseline, statusTop && statusTop.label, op && op.birthdate]);
 
   useEffect(() => {
     if (!loaded || !opOnboarded || !op) return;
@@ -584,7 +682,7 @@ function App() {
         <div className="main">
           {tab==='command' && <CommandCenter operators={operators} campaigns={campaigns} logs={logs} activeOp={op} deployedCampaign={deployedCampaignTop} onGoCampaigns={()=>setTab('campaigns')} streak={streak} quips={quips} campaignPOIs={campaignPOIs} challengePool={challengePool} challengeCompletions={challengeCompletions} />}
           {tab==='campaigns' && <Campaigns campaigns={campaigns} activeOp={op} logs={logs} onDeploy={deployToCampaign} onUndeploy={undeploy} onClaimReinforcement={claimReinforcement} campaignPOIs={campaignPOIs} />}
-          {tab==='galaxy' && <GalaxyMap entries={codexEntries} campaigns={campaigns} logs={logs} onGoCampaigns={()=>setTab('campaigns')} />}
+          {tab==='galaxy' && <GalaxyMap entries={codexEntries} campaigns={campaigns} logs={logs} onGoCampaigns={()=>setTab('campaigns')} quadrants={quadrants} sectors={sectors} systems={systems} planets={planets} moons={moons} asteroidBelts={asteroidBelts} deepVoidFeatures={deepVoidFeatures} />}
           {tab==='log' && <LogActivity deployedCampaign={deployedCampaignTop} activeOp={op} logs={logs} addLogs={addLogs} campaigns={campaigns} exercises={exercises} protocolSessions={protocolSessions} onRecordPR={recordPersonalRecord} raidTemplates={raidTemplates} raidInstances={raidInstances} />}
           {tab==='myprotocols' && <MyProtocols op={op} onSave={saveCustomProtocol} onDelete={deleteCustomProtocol} exercises={exercises} />}
           {tab==='habits' && <Habits op={op} logs={logs} onAddHabit={addHabit} onToggleArchive={toggleHabitArchive} onCheckin={logHabitCheckin} />}
@@ -596,7 +694,7 @@ function App() {
             squadHabitChallenges={squadHabitChallenges} squadHabitOptIns={squadHabitOptIns} squadHabitCheckins={squadHabitCheckins}
             onCreateSquadHabitChallenge={createSquadHabitChallenge} onJoinSquadHabitChallenge={joinSquadHabitChallenge} onCheckinSquadHabitChallenge={checkinSquadHabitChallenge}
             joinRequests={joinRequests} onApproveJoinRequest={approveJoinRequest} onDenyJoinRequest={denyJoinRequest} />}
-          {tab==='dossier' && <Dossier op={dossierOp} activeOpId={op.id} operators={operators} campaigns={campaigns} logs={logs} squads={squads} awards={awards} personalRecords={personalRecords} onUpdateOperator={updateOperator} onUploadAvatar={uploadAvatar} />}
+          {tab==='dossier' && <Dossier op={dossierOp} activeOpId={op.id} operators={operators} campaigns={campaigns} logs={logs} squads={squads} awards={awards} personalRecords={personalRecords} onUpdateOperator={updateOperator} onUploadAvatar={uploadAvatar} onSetBirthdate={setBirthdateOnce} />}
           {tab==='roster' && <Roster operators={operators} campaigns={campaigns} logs={logs} onView={(id)=>{setViewDossierId(id); setTab('dossier');}} />}
           {tab==='codex' && <Codex entries={codexEntries} isAdmin={op.isAdmin} onUpdate={updateCodex} />}
           {tab==='comms' && <Comms chat={chat} operators={operators} squads={squads} activeOp={op} onSend={sendChat} cheers={cheers} onCheer={cheerMessage} />}
@@ -609,7 +707,9 @@ function App() {
             campaignPOIs={campaignPOIs} onSavePOI={savePOI} onDeletePOI={deletePOI}
             challengePool={challengePool} onSaveChallenge={saveChallenge} onDeleteChallenge={deleteChallenge}
             seasons={seasons} onSaveSeason={saveSeason} onDeleteSeason={deleteSeason}
-            announcements={announcements} onSaveAnnouncement={saveAnnouncement} onDeleteAnnouncement={deleteAnnouncement} />}
+            announcements={announcements} onSaveAnnouncement={saveAnnouncement} onDeleteAnnouncement={deleteAnnouncement}
+            onGrantAward={grantManualAward} onUpdateBirthdateAdmin={updateBirthdateAdmin}
+            quadrants={quadrants} sectors={sectors} systems={systems} planets={planets} />}
         </div>
       </div>
 
@@ -652,3 +752,4 @@ function App() {
     </div>
   );
 }
+
