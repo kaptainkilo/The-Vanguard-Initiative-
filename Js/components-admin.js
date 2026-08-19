@@ -18,12 +18,28 @@ function RaidObjectiveAdder({ onAdd }) {
   );
 }
 
-function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCampaigns, exercises, protocolSessions, onSaveExercise, onDeleteExercise, onSaveProtocolSession, onDeleteProtocolSession, quips, onSaveQuip, onDeleteQuip, raidTemplates, onSaveRaidTemplate, onDeleteRaidTemplate, campaignPOIs, onSavePOI, onDeletePOI, challengePool, onSaveChallenge, onDeleteChallenge, seasons, onSaveSeason, onDeleteSeason, announcements, onSaveAnnouncement, onDeleteAnnouncement }) {
+function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCampaigns, exercises, protocolSessions, onSaveExercise, onDeleteExercise, onSaveProtocolSession, onDeleteProtocolSession, quips, onSaveQuip, onDeleteQuip, raidTemplates, onSaveRaidTemplate, onDeleteRaidTemplate, campaignPOIs, onSavePOI, onDeletePOI, challengePool, onSaveChallenge, onDeleteChallenge, seasons, onSaveSeason, onDeleteSeason, announcements, onSaveAnnouncement, onDeleteAnnouncement, onGrantAward, onUpdateBirthdateAdmin, quadrants, sectors, systems, planets }) {
   const [editingId, setEditingId] = useState(campaigns[0] ? campaigns[0].id : null);
   const [savedMsg, setSavedMsg] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [draft, setDraft] = useState(null);
   useEffect(() => { const c = campaigns.find(c=>c.id===editingId); setDraft(c ? JSON.parse(JSON.stringify(c)) : null); }, [editingId]);
+  const [campaignQuadrantId, setCampaignQuadrantId] = useState('');
+  const [campaignSectorId, setCampaignSectorId] = useState('');
+  const [campaignSystemId, setCampaignSystemId] = useState('');
+  useEffect(() => {
+    const c = campaigns.find(c=>c.id===editingId);
+    if (c && c.planetId) {
+      const p = planets.find(x=>x.id===c.planetId);
+      const sy = p ? systems.find(x=>x.id===p.systemId) : null;
+      const se = sy ? sectors.find(x=>x.id===sy.sectorId) : null;
+      setCampaignSystemId(sy ? sy.id : '');
+      setCampaignSectorId(se ? se.id : '');
+      setCampaignQuadrantId(se ? se.quadrantId : '');
+    } else {
+      setCampaignQuadrantId(''); setCampaignSectorId(''); setCampaignSystemId('');
+    }
+  }, [editingId]);
 
   const [exEditing, setExEditing] = useState(null);
   const [exDraft, setExDraft] = useState(null);
@@ -43,6 +59,9 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
   const [raidSaving, setRaidSaving] = useState(false);
   const [poiDraft, setPoiDraft] = useState(null);
   const [poiConfirmDelete, setPoiConfirmDelete] = useState(null);
+  const [subTab, setSubTab] = useState('campaigns');
+  const [grantAwardFor, setGrantAwardFor] = useState(null);
+  const [grantAwardDraft, setGrantAwardDraft] = useState({title:'', description:''});
 
   function updateLocField(idx, field, val) {
     const locs = draft.locations.slice();
@@ -88,6 +107,13 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
 
   return (
     <div>
+      <div className="radio-group" style={{marginBottom:16}}>
+        <div className={"radio-opt"+(subTab==='campaigns'?' sel':'')} onClick={()=>setSubTab('campaigns')}>Campaigns</div>
+        <div className={"radio-opt"+(subTab==='library'?' sel':'')} onClick={()=>setSubTab('library')}>Content Library</div>
+        <div className={"radio-opt"+(subTab==='competitive'?' sel':'')} onClick={()=>setSubTab('competitive')}>Competitive & Events</div>
+        <div className={"radio-opt"+(subTab==='roster'?' sel':'')} onClick={()=>setSubTab('roster')}>Roster</div>
+      </div>
+      {subTab==='campaigns' && (<>
       <div className="panel">
         <div className="bracket-label">Admin — Campaigns</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
@@ -99,7 +125,28 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
             <div className="field"><label>Campaign Name</label><input type="text" value={draft.name} onChange={e=>setDraft(Object.assign({},draft,{name:e.target.value}))} /></div>
             <div className="grid2">
               <div className="field"><label>Threat / Faction</label><input type="text" value={draft.threat} onChange={e=>setDraft(Object.assign({},draft,{threat:e.target.value}))} /></div>
-              <div className="field"><label>Sector</label><input type="text" value={draft.sector} onChange={e=>setDraft(Object.assign({},draft,{sector:e.target.value}))} /></div>
+              <div className="field"><label>Sector (legacy label, still shown on Campaign cards)</label><input type="text" value={draft.sector} onChange={e=>setDraft(Object.assign({},draft,{sector:e.target.value}))} /></div>
+              <div className="field"><label>Target Planet</label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  <select value={campaignQuadrantId} onChange={e=>{setCampaignQuadrantId(e.target.value); setCampaignSectorId(''); setCampaignSystemId(''); setDraft(Object.assign({},draft,{planetId:null}));}}>
+                    <option value="">Quadrant...</option>
+                    {quadrants.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
+                  </select>
+                  <select value={campaignSectorId} onChange={e=>{setCampaignSectorId(e.target.value); setCampaignSystemId(''); setDraft(Object.assign({},draft,{planetId:null}));}} disabled={!campaignQuadrantId}>
+                    <option value="">Sector...</option>
+                    {sectors.filter(s=>s.quadrantId===campaignQuadrantId && s.known).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                  </select>
+                  <select value={campaignSystemId} onChange={e=>{setCampaignSystemId(e.target.value); setDraft(Object.assign({},draft,{planetId:null}));}} disabled={!campaignSectorId}>
+                    <option value="">System...</option>
+                    {systems.filter(sy=>sy.sectorId===campaignSectorId).map(sy => <option key={sy.id} value={sy.id}>{sy.name}</option>)}
+                  </select>
+                  <select value={draft.planetId||''} onChange={e=>setDraft(Object.assign({},draft,{planetId:e.target.value||null}))} disabled={!campaignSystemId}>
+                    <option value="">Planet...</option>
+                    {planets.filter(p=>p.systemId===campaignSystemId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div className="dim mono" style={{fontSize:10,marginTop:4}}>Optional {'\u2014'} links this Campaign to the Galaxy Map and shows real-time Control % there. Campaigns without a linked planet still work exactly as before.</div>
+              </div>
             </div>
             <div className="grid2">
               <div className="field"><label>Join Window (days)</label><input type="number" value={draft.joinWindowDays} onChange={e=>setDraft(Object.assign({},draft,{joinWindowDays:Number(e.target.value)}))} /></div>
@@ -170,6 +217,8 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
           </div>
         )}
       </div>
+      </>)}
+      {subTab==='library' && (<>
 
       <div className="panel">
         <div className="bracket-label">Admin — Exercise Library ({exercises.length})</div>
@@ -316,6 +365,8 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
           }}>+ Add</button>
         </div>
       </div>
+      </>)}
+      {subTab==='competitive' && (<>
 
       <div className="panel">
         <div className="bracket-label">Admin — Leaderboard Seasons ({seasons.length})</div>
@@ -446,21 +497,25 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
           <button className="ghost small" onClick={()=>setRaidDraft({id:undefined, name:'New Raid', bossName:'Unnamed Threat', bossFlavor:'', areas:[]})}>+ New Raid</button>
         )}
       </div>
+      </>)}
+      {subTab==='roster' && (<>
 
       <div className="panel">
         <div className="bracket-label">Admin — Roster Management</div>
         <div className="info-note" style={{marginBottom:12}}>Toggling Admin or Mod automatically sets the operator's rank to Command Staff or Jr Command Staff — these are conferred by role, not chosen. Admin takes precedence if both are checked.</div>
         <table>
-          <thead><tr><th>Callsign</th><th>Weekly Target</th><th>Age Division</th><th>Admin</th><th>Mod</th><th>Command Rank</th><th></th></tr></thead>
+          <thead><tr><th>Callsign</th><th>Weekly Target</th><th>Age Division</th><th>Birthdate</th><th>Admin</th><th>Mod</th><th>Command Rank</th><th></th><th></th></tr></thead>
           <tbody>
             {operators.map(o => (
               <tr key={o.id}>
                 <td className="disp" style={{fontFamily:"'Oswald',sans-serif"}}>{o.callsign}</td>
                 <td><input type="number" value={o.weeklyTarget} onChange={e=>updateOpField(o.id,'weeklyTarget',e.target.value)} style={{width:60}} /></td>
                 <td><select value={o.ageDivision} onChange={e=>updateOpField(o.id,'ageDivision',e.target.value)}>{AGE_DIVISIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></td>
+                <td><input type="date" value={o.birthdate||''} onChange={e=>onUpdateBirthdateAdmin(o.id, e.target.value)} style={{fontSize:11}} /></td>
                 <td><input type="checkbox" checked={!!o.isAdmin} onChange={e=>updateOpField(o.id,'isAdmin',e.target.checked)} /></td>
                 <td><input type="checkbox" checked={!!o.isModerator} onChange={e=>updateOpField(o.id,'isModerator',e.target.checked)} /></td>
                 <td className="dim" style={{fontSize:11}}>{(() => { const oOrs = computeORS(o.id, o, logs); const oStatus = computeReadinessStatus(o.id, logs); return commandRankDisplay(computeCommandRank(o, oOrs.ors, o.id, logs, campaigns, oStatus)) || '—'; })()}</td>
+                <td><button className="small ghost" onClick={()=>{setGrantAwardFor(o.id); setGrantAwardDraft({title:'', description:''});}}>Grant Award</button></td>
                 <td>
                   {confirmDelete===o.id ? (
                     <span style={{display:'flex',gap:6}}><button className="small danger" onClick={()=>deleteOperator(o.id)}>Confirm</button><button className="small ghost" onClick={()=>setConfirmDelete(null)}>Cancel</button></span>
@@ -470,7 +525,27 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
             ))}
           </tbody>
         </table>
+        {grantAwardFor && (
+          <div style={{border:'1px solid var(--amber)',borderRadius:2,padding:12,marginTop:14}}>
+            <div style={{fontSize:12,marginBottom:8}}>Granting an award to <strong>{(operators.find(o=>o.id===grantAwardFor)||{}).callsign}</strong></div>
+            <div style={{display:'flex',gap:8,marginBottom:10}}>
+              <button className="ghost small" onClick={()=>setGrantAwardDraft({title:'Founding Operator', description:'Here from the beginning \u2014 before there was a wide audience, before there was a track record. Just training, and trust that it would matter.'})}>Use "Founding Operator" preset</button>
+            </div>
+            <div className="field"><label>Title</label><input type="text" value={grantAwardDraft.title} onChange={e=>setGrantAwardDraft(Object.assign({},grantAwardDraft,{title:e.target.value}))} /></div>
+            <div className="field"><label>Description</label><textarea value={grantAwardDraft.description} onChange={e=>setGrantAwardDraft(Object.assign({},grantAwardDraft,{description:e.target.value}))} rows="3" style={{width:'100%'}} /></div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="primary small" onClick={()=>{
+                if (!grantAwardDraft.title.trim()) return;
+                const isFounding = grantAwardDraft.title.trim() === 'Founding Operator';
+                onGrantAward(grantAwardFor, grantAwardDraft.title.trim(), grantAwardDraft.description.trim(), isFounding ? 'founding_operator' : null);
+                setGrantAwardFor(null);
+              }}>Grant</button>
+              <button className="ghost small" onClick={()=>setGrantAwardFor(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
+        </>)}
     </div>
   );
 }
