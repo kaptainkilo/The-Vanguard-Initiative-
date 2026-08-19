@@ -1,3 +1,29 @@
+function GettingStartedChecklist({ op, logs }) {
+  const items = [
+    { done: logs.some(l=>l.operatorId===op.id), label: 'Log your first AAR', hint: 'Any Structured Session, Freeform Exercise, or Rest Day counts.' },
+    { done: (op.habits||[]).length > 0, label: 'Set up a Habit', hint: 'Powers the Personal Development slice of your ORS.' },
+    { done: logs.some(l=>l.operatorId===op.id && l.type==='campaign'), label: 'Deploy to a Campaign', hint: 'Command Center \u2192 Campaigns tab.' },
+    { done: !!op.squadId, label: 'Join a Squad', hint: 'Fully optional \u2014 never required for progress.' },
+    { done: !!op.specialization, label: 'Choose a Specialization', hint: 'Unlocks at Operator rank.' },
+  ];
+  const remaining = items.filter(i=>!i.done);
+  if (remaining.length === 0) return null;
+  return (
+    <div className="panel" style={{borderColor:'var(--amber-dim)'}}>
+      <div className="bracket-label">Orientation Checklist</div>
+      {items.map((it,i) => (
+        <div key={i} style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:8}}>
+          <span style={{color: it.done?'var(--success)':'var(--text-dim)',fontSize:13}}>{it.done ? '\u2705' : '\u2b1c'}</span>
+          <div>
+            <div style={{fontSize:12,textDecoration: it.done?'line-through':'none',opacity: it.done?0.6:1}}>{it.label}</div>
+            {!it.done && <div className="dim" style={{fontSize:10}}>{it.hint}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign, onGoCampaigns, streak, quips, campaignPOIs, challengePool, challengeCompletions }) {
   const [selectedPOI, setSelectedPOI] = useState(null);
   const orsData = computeORS(activeOp.id, activeOp, logs);
@@ -20,6 +46,7 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
 
   return (
     <div>
+      <GettingStartedChecklist op={activeOp} logs={logs} />
       {notifications.map(n => (
         <div key={n.id} className="panel" style={{borderColor: n.severity==='urgent'?'var(--threat)':n.severity==='warning'?'var(--amber)':'var(--border)', padding:'12px 16px', marginBottom:12}}>
           <div style={{fontSize:12, color: n.severity==='urgent'?'var(--threat)':'var(--amber)'}}>{n.text}</div>
@@ -349,6 +376,7 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
   const [launchingTemplateId, setLaunchingTemplateId] = useState(null);
   const [duelDraft, setDuelDraft] = useState({opponentSquadId:'', muscleGroup:'Any', target:'', unit:'reps', durationDays:'7'});
   const [habitChallengeDraft, setHabitChallengeDraft] = useState({name:'', description:'', durationDays:'7'});
+  const [subTab, setSubTab] = useState('overview');
   const currentSeason = computeCurrentSeason(seasons);
 
   const mySquad = activeOp.squadId ? squads.find(s=>s.id===activeOp.squadId) : null;
@@ -401,6 +429,13 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
 
   return (
     <div>
+      <div className="radio-group" style={{marginBottom:16}}>
+        <div className={"radio-opt"+(subTab==='overview'?' sel':'')} onClick={()=>setSubTab('overview')}>Overview</div>
+        <div className={"radio-opt"+(subTab==='competitions'?' sel':'')} onClick={()=>setSubTab('competitions')}>Competitions</div>
+        <div className={"radio-opt"+(subTab==='habits'?' sel':'')} onClick={()=>setSubTab('habits')}>Habits</div>
+        <div className={"radio-opt"+(subTab==='leaderboards'?' sel':'')} onClick={()=>setSubTab('leaderboards')}>Leaderboards</div>
+      </div>
+      {subTab==='overview' && (<>
       {isLeadership && pendingJoinRequests.length > 0 && (
         <div className="panel" style={{borderColor:'var(--amber)'}}>
           <div className="bracket-label">Incoming Join Requests</div>
@@ -477,6 +512,8 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
         </div>
       </div>
 
+        </>)}
+        {subTab==='leaderboards' && (<>
       <div className="grid2">
         <div className="panel">
           <div className="bracket-label">Leaderboard — MCP{currentSeason ? ' ('+currentSeason.name+')' : ' (All-Time)'}</div>
@@ -498,6 +535,8 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
         ))}
       </div>
 
+        </>)}
+        {subTab==='competitions' && (<>
       {(() => {
         const myActiveRaid = raidInstances.find(r => r.squadId === mySquad.id && r.status === 'active');
         const myTemplate = myActiveRaid ? raidTemplates.find(t => t.id === myActiveRaid.raidTemplateId) : null;
@@ -663,6 +702,8 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
         );
       })()}
 
+        </>)}
+        {subTab==='habits' && (<>
       {(() => {
         const myActiveChallenges = squadHabitChallenges.filter(c => c.squadId===mySquad.id && c.status==='active');
         const myPastChallenges = squadHabitChallenges.filter(c => c.squadId===mySquad.id && c.status==='completed').slice(-5);
@@ -671,7 +712,7 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
             {myActiveChallenges.length > 0 && (
               <div className="panel">
                 <div className="bracket-label">Shared Habit Challenges</div>
-                <div className="info-note" style={{marginBottom:12}}>Purely social \u2014 doesn't touch ORS. Just a shared thermometer and bragging rights.</div>
+                <div className="info-note" style={{marginBottom:12}}>Purely social {'\u2014'} doesn't touch ORS. Just a shared thermometer and bragging rights.</div>
                 {myActiveChallenges.map(c => {
                   const optedIn = squadHabitOptIns.filter(o=>o.challengeId===c.id);
                   const iAmIn = optedIn.some(o=>o.operatorId===activeOp.id);
@@ -729,6 +770,7 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
           </div>
         );
       })()}
+        </>)}
     </div>
   );
 }
@@ -743,27 +785,13 @@ function formatDuration(ms) {
   return minutes+'m';
 }
 
-function planetFactionClass(planet) {
-  const text = (planet.title + ' ' + planet.body).toLowerCase();
-  if (text.includes('kharvax')) return 'faction-kharvax';
-  if (text.includes('voss')) return 'faction-voss';
-  if (text.includes('skarn')) return 'faction-skarn';
-  return 'faction-unknown';
-}
-function planetPosition(idx, total) {
-  const angle = (idx / Math.max(1,total)) * 2 * Math.PI - Math.PI/2;
-  const radiusX = 36, radiusY = 34;
-  const left = 50 + radiusX * Math.cos(angle);
-  const top = 50 + radiusY * Math.sin(angle);
-  return { left: left+'%', top: top+'%' };
-}
-function planetStatus(planet, campaigns, logs) {
-  const matches = campaigns.filter(c => c.sector === planet.title);
+function planetStatusById(planetId, campaigns, logs) {
+  const matches = campaigns.filter(c => c.planetId === planetId);
   if (matches.length === 0) return { label: 'Uncharted', detail: null, campaign: null };
   const active = matches.find(c => campaignPhase(c) === 'active' || campaignPhase(c) === 'recruiting');
   if (active) {
     const pct = Math.round(computePlanetControl(computeLocationProgress(active, logs)));
-    return { label: `Contested — ${pct}% Control`, detail: campaignPhase(active), campaign: active };
+    return { label: 'Contested \u2014 '+pct+'% Control', detail: campaignPhase(active), campaign: active };
   }
   const success = matches.find(c => c.resolved === 'success');
   if (success) return { label: 'Secured', detail: 'success', campaign: success };
@@ -772,53 +800,123 @@ function planetStatus(planet, campaigns, logs) {
   return { label: 'Uncharted', detail: null, campaign: null };
 }
 
-function GalaxyMap({ entries, campaigns, logs, onGoCampaigns }) {
-  const [selected, setSelected] = useState(null);
-  const planets = entries.filter(e => e.category === 'Planets');
-  const selectedPlanet = selected ? planets.find(p=>p.id===selected) : null;
-  const selectedStatus = selectedPlanet ? planetStatus(selectedPlanet, campaigns, logs) : null;
+function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors, systems, planets, moons, asteroidBelts, deepVoidFeatures }) {
+  const [level, setLevel] = useState('quadrants');
+  const [selectedQuadrantId, setSelectedQuadrantId] = useState(null);
+  const [selectedSectorId, setSelectedSectorId] = useState(null);
+  const [selectedSystemId, setSelectedSystemId] = useState(null);
+
+  const selectedQuadrant = quadrants.find(q=>q.id===selectedQuadrantId);
+  const selectedSector = sectors.find(s=>s.id===selectedSectorId);
+  const selectedSystem = systems.find(s=>s.id===selectedSystemId);
+
+  function goQuadrants() { setLevel('quadrants'); setSelectedQuadrantId(null); setSelectedSectorId(null); setSelectedSystemId(null); }
+  function goSectorGrid(qId) { setLevel('sector-grid'); setSelectedQuadrantId(qId); setSelectedSectorId(null); setSelectedSystemId(null); }
+  function goSectorDetail(sId) { setLevel('sector-detail'); setSelectedSectorId(sId); setSelectedSystemId(null); }
+  function goSystemDetail(sysId) { setLevel('system-detail'); setSelectedSystemId(sysId); }
 
   return (
     <div>
       <div className="panel">
         <div className="bracket-label">Galactic Map</div>
-        <div className="galaxy-wrap">
-          <div className="galaxy-core">
-            <div className="galaxy-core-dot"></div>
-            <div className="galaxy-core-label">UEA CORE — SECURED</div>
-          </div>
-          {planets.map((p, idx) => {
-            const pos = planetPosition(idx, planets.length);
-            const status = planetStatus(p, campaigns, logs);
-            const factionClass = planetFactionClass(p);
-            return (
-              <div key={p.id} className={"planet-node "+factionClass} style={{left:pos.left, top:pos.top}} onClick={()=>setSelected(p.id)}>
-                <div className="planet-dot"></div>
-                <div className="planet-label" style={{color: selected===p.id?'var(--amber)':'var(--text-dim)'}}>{p.title}</div>
-              </div>
-            );
-          })}
+        <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:16,fontFamily:"'IBM Plex Mono',monospace"}}>
+          <span style={{cursor:'pointer',color: level==='quadrants'?'var(--amber)':'var(--text-dim)'}} onClick={goQuadrants}>Galaxy</span>
+          {selectedQuadrant && <> {'\u203a'} <span style={{cursor:'pointer',color: level==='sector-grid'?'var(--amber)':'var(--text-dim)'}} onClick={()=>goSectorGrid(selectedQuadrant.id)}>{selectedQuadrant.name}</span></>}
+          {selectedSector && <> {'\u203a'} <span style={{cursor:'pointer',color: level==='sector-detail'?'var(--amber)':'var(--text-dim)'}} onClick={()=>goSectorDetail(selectedSector.id)}>{selectedSector.code}</span></>}
+          {selectedSystem && <> {'\u203a'} <span style={{color:'var(--amber)'}}>{selectedSystem.name}</span></>}
         </div>
-        <div className="galaxy-legend">
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#E4572E'}}></div>Kharvax Swarm</div>
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#7CA9E8'}}></div>Voss Directorate</div>
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#6FCF97'}}></div>Skarn Collective</div>
-          <div className="galaxy-legend-item"><div className="galaxy-legend-dot" style={{background:'#8A93A6'}}></div>Unclaimed / Renders</div>
-        </div>
-      </div>
 
-      {selectedPlanet ? (
-        <div className="panel">
-          <div className="bracket-label">{selectedPlanet.title}</div>
-          <div style={{fontSize:13,lineHeight:1.8,color:'var(--text-dim)',marginBottom:14}}>{selectedPlanet.body}</div>
-          <div className="stat-row"><span>Status</span><span className="amber">{selectedStatus.label}</span></div>
-          {selectedStatus.campaign && (selectedStatus.detail==='active'||selectedStatus.detail==='recruiting') && (
-            <button className="primary small" style={{marginTop:10}} onClick={onGoCampaigns}>View Campaign</button>
-          )}
-        </div>
-      ) : (
-        <div className="panel"><div className="dim" style={{fontSize:12}}>Click a world to view its Codex entry and current Campaign status.</div></div>
-      )}
+        {level === 'quadrants' && (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,maxWidth:480}}>
+            {['Alpha','Beta','Gamma','Delta'].map(qName => {
+              const q = quadrants.find(x=>x.name===qName);
+              if (!q) return null;
+              const qSectors = sectors.filter(s=>s.quadrantId===q.id);
+              const knownCount = qSectors.filter(s=>s.known).length;
+              return (
+                <div key={q.id} className="protocol-card" style={{cursor:'pointer',textAlign:'center',padding:'24px 12px'}} onClick={()=>goSectorGrid(q.id)}>
+                  <div className="disp" style={{fontSize:18}}>{q.name}</div>
+                  <div className="dim mono" style={{fontSize:10,marginTop:4}}>{knownCount} of 9 Sectors documented</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {level === 'sector-grid' && selectedQuadrant && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8,maxWidth:340}}>
+            {[1,2,3,4,5,6,7,8,9].map(num => {
+              const sec = sectors.find(s=>s.quadrantId===selectedQuadrant.id && s.sectorNumber===num);
+              if (sec && sec.known) {
+                return (
+                  <div key={num} className="protocol-card" style={{cursor:'pointer',textAlign:'center',padding:'14px 6px'}} onClick={()=>goSectorDetail(sec.id)}>
+                    <div style={{fontSize:11,fontWeight:600}}>{sec.name}</div>
+                    <div className="dim mono" style={{fontSize:9}}>{sec.code}</div>
+                  </div>
+                );
+              }
+              return (
+                <div key={num} style={{border:'1px dashed var(--border)',borderRadius:2,textAlign:'center',padding:'14px 6px',opacity:0.4}}>
+                  <div className="dim" style={{fontSize:10}}>Undocumented</div>
+                  <div className="dim mono" style={{fontSize:9}}>{selectedQuadrant.name}-{num}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {level === 'sector-detail' && selectedSector && (
+          <div>
+            <div style={{fontSize:13,lineHeight:1.7,color:'var(--text-dim)',marginBottom:16}}>{selectedSector.description}</div>
+            {systems.filter(sy=>sy.sectorId===selectedSector.id).map(sy => (
+              <div key={sy.id} className="protocol-card" style={{cursor:'pointer',marginBottom:8}} onClick={()=>goSystemDetail(sy.id)}>
+                <div style={{fontWeight:600,fontSize:13}}>{sy.name}</div>
+                {sy.starName && <div className="dim" style={{fontSize:11}}>Star: {sy.starName}</div>}
+              </div>
+            ))}
+            {deepVoidFeatures.filter(d=>d.sectorId===selectedSector.id).length > 0 && (
+              <div style={{marginTop:14}}>
+                <div className="dim mono" style={{fontSize:10,marginBottom:8,letterSpacing:'0.05em'}}>DEEP VOID FEATURES</div>
+                {deepVoidFeatures.filter(d=>d.sectorId===selectedSector.id).map(d => (
+                  <div key={d.id} style={{marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:600}}>{d.name} <span className="dim" style={{fontWeight:400,fontSize:10}}>({d.featureType.replace(/_/g,' ')})</span></div>
+                    <div className="dim" style={{fontSize:11}}>{d.description}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {level === 'system-detail' && selectedSystem && (
+          <div>
+            {selectedSystem.starDescription && <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>{selectedSystem.starDescription}</div>}
+            {planets.filter(p=>p.systemId===selectedSystem.id).sort((a,b)=>(a.orderIndex||0)-(b.orderIndex||0)).map(p => {
+              const status = planetStatusById(p.id, campaigns, logs);
+              const planetMoons = moons.filter(m=>m.planetId===p.id);
+              return (
+                <div key={p.id} className="protocol-card" style={{marginBottom:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+                    <span className="pill" style={{fontSize:10}}>{status.label}</span>
+                  </div>
+                  <div className="dim" style={{fontSize:11,marginTop:4}}>{p.description}</div>
+                  {planetMoons.length > 0 && <div className="dim mono" style={{fontSize:10,marginTop:6}}>Moons: {planetMoons.map(m=>m.name).join(', ')}</div>}
+                  {status.campaign && (status.detail==='active'||status.detail==='recruiting') && (
+                    <button className="primary small" style={{marginTop:8}} onClick={onGoCampaigns}>View Campaign</button>
+                  )}
+                </div>
+              );
+            })}
+            {asteroidBelts.filter(a=>a.systemId===selectedSystem.id).map(a => (
+              <div key={a.id} className="protocol-card" style={{marginBottom:10}}>
+                <div style={{fontWeight:600,fontSize:13}}>{a.name}</div>
+                <div className="dim" style={{fontSize:11,marginTop:4}}>{a.description}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -974,3 +1072,4 @@ function personalBest(operatorId, logs, exerciseName) {
   if (prior.length === 0) return null;
   return Math.max.apply(null, prior.map(l=>l.totalValue));
 }
+
