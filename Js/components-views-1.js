@@ -805,15 +805,16 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
   const [selectedQuadrantId, setSelectedQuadrantId] = useState(null);
   const [selectedSectorId, setSelectedSectorId] = useState(null);
   const [selectedSystemId, setSelectedSystemId] = useState(null);
+  const [selectedPlanetId, setSelectedPlanetId] = useState(null);
 
   const selectedQuadrant = quadrants.find(q=>q.id===selectedQuadrantId);
   const selectedSector = sectors.find(s=>s.id===selectedSectorId);
   const selectedSystem = systems.find(s=>s.id===selectedSystemId);
 
-  function goQuadrants() { setLevel('quadrants'); setSelectedQuadrantId(null); setSelectedSectorId(null); setSelectedSystemId(null); }
-  function goSectorGrid(qId) { setLevel('sector-grid'); setSelectedQuadrantId(qId); setSelectedSectorId(null); setSelectedSystemId(null); }
-  function goSectorDetail(sId) { setLevel('sector-detail'); setSelectedSectorId(sId); setSelectedSystemId(null); }
-  function goSystemDetail(sysId) { setLevel('system-detail'); setSelectedSystemId(sysId); }
+  function goQuadrants() { setLevel('quadrants'); setSelectedQuadrantId(null); setSelectedSectorId(null); setSelectedSystemId(null); setSelectedPlanetId(null); }
+  function goSectorGrid(qId) { setLevel('sector-grid'); setSelectedQuadrantId(qId); setSelectedSectorId(null); setSelectedSystemId(null); setSelectedPlanetId(null); }
+  function goSectorDetail(sId) { setLevel('sector-detail'); setSelectedSectorId(sId); setSelectedSystemId(null); setSelectedPlanetId(null); }
+  function goSystemDetail(sysId) { setLevel('system-detail'); setSelectedSystemId(sysId); setSelectedPlanetId(null); }
 
   return (
     <div>
@@ -827,15 +828,18 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
         </div>
 
         {level === 'quadrants' && (
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,maxWidth:480}}>
+          <div style={{position:'relative', maxWidth:480, aspectRatio:'1', margin:'0 auto',
+              background:"radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.35), transparent), radial-gradient(1px 1px at 40% 55%, rgba(255,255,255,0.25), transparent), radial-gradient(1px 1px at 70% 15%, rgba(255,255,255,0.3), transparent), radial-gradient(1px 1px at 85% 65%, rgba(255,255,255,0.2), transparent), radial-gradient(1px 1px at 25% 80%, rgba(255,255,255,0.25), transparent), radial-gradient(1px 1px at 60% 85%, rgba(255,255,255,0.18), transparent), #05070d",
+              border:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr', gridTemplateRows:'1fr 1fr'}}>
             {['Alpha','Beta','Gamma','Delta'].map(qName => {
               const q = quadrants.find(x=>x.name===qName);
               if (!q) return null;
               const qSectors = sectors.filter(s=>s.quadrantId===q.id);
               const knownCount = qSectors.filter(s=>s.known).length;
+              const tint = {Alpha:'rgba(124,169,232,0.07)', Beta:'rgba(181,126,220,0.07)', Gamma:'rgba(111,207,151,0.07)', Delta:'rgba(242,201,76,0.09)'}[qName];
               return (
-                <div key={q.id} className="protocol-card" style={{cursor:'pointer',textAlign:'center',padding:'24px 12px'}} onClick={()=>goSectorGrid(q.id)}>
-                  <div className="disp" style={{fontSize:18}}>{q.name}</div>
+                <div key={q.id} style={{cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:tint,border:'1px solid var(--border)'}} onClick={()=>goSectorGrid(q.id)}>
+                  <div className="disp" style={{fontSize:22}}>{q.name}</div>
                   <div className="dim mono" style={{fontSize:10,marginTop:4}}>{knownCount} of 9 Sectors documented</div>
                 </div>
               );
@@ -844,21 +848,30 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
         )}
 
         {level === 'sector-grid' && selectedQuadrant && (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8,maxWidth:340}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:4,maxWidth:340}}>
             {[1,2,3,4,5,6,7,8,9].map(num => {
               const sec = sectors.find(s=>s.quadrantId===selectedQuadrant.id && s.sectorNumber===num);
               if (sec && sec.known) {
+                const isHome = sec.code === 'Delta-1';
                 return (
-                  <div key={num} className="protocol-card" style={{cursor:'pointer',textAlign:'center',padding:'14px 6px'}} onClick={()=>goSectorDetail(sec.id)}>
-                    <div style={{fontSize:11,fontWeight:600}}>{sec.name}</div>
+                  <div key={num} style={{
+                      cursor:'pointer',textAlign:'center',padding:'16px 6px',borderRadius:2,
+                      background: isHome ? 'rgba(57,255,20,0.12)' : 'rgba(242,201,76,0.08)',
+                      border:'1px solid '+(isHome?'var(--success)':'var(--amber-dim)'),
+                      boxShadow: '0 0 12px '+(isHome?'rgba(57,255,20,0.25)':'rgba(242,201,76,0.15)'),
+                    }} onClick={()=>goSectorDetail(sec.id)}>
+                    <div style={{fontSize:11,fontWeight:600,color: isHome?'var(--success)':'var(--text)'}}>{sec.name}</div>
                     <div className="dim mono" style={{fontSize:9}}>{sec.code}</div>
                   </div>
                 );
               }
               return (
-                <div key={num} style={{border:'1px dashed var(--border)',borderRadius:2,textAlign:'center',padding:'14px 6px',opacity:0.4}}>
-                  <div className="dim" style={{fontSize:10}}>Undocumented</div>
-                  <div className="dim mono" style={{fontSize:9}}>{selectedQuadrant.name}-{num}</div>
+                <div key={num} style={{
+                    textAlign:'center',padding:'16px 6px',borderRadius:2,
+                    background:'repeating-linear-gradient(45deg, #0A0C0A, #0A0C0A 4px, #14170F 4px, #14170F 8px)',
+                    border:'1px solid var(--border)', opacity:0.5,
+                  }}>
+                  <div className="dim mono" style={{fontSize:11}}>{'\u2591\u2591\u2591'}</div>
                 </div>
               );
             })}
@@ -888,34 +901,71 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
           </div>
         )}
 
-        {level === 'system-detail' && selectedSystem && (
-          <div>
-            {selectedSystem.starDescription && <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>{selectedSystem.starDescription}</div>}
-            {planets.filter(p=>p.systemId===selectedSystem.id).sort((a,b)=>(a.orderIndex||0)-(b.orderIndex||0)).map(p => {
-              const status = planetStatusById(p.id, campaigns, logs);
-              const planetMoons = moons.filter(m=>m.planetId===p.id);
-              return (
-                <div key={p.id} className="protocol-card" style={{marginBottom:10}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
-                    <span className="pill" style={{fontSize:10}}>{status.label}</span>
+        {level === 'system-detail' && selectedSystem && (() => {
+          const sysPlanets = planets.filter(p=>p.systemId===selectedSystem.id).sort((a,b)=>(a.orderIndex||0)-(b.orderIndex||0));
+          const sysBelts = asteroidBelts.filter(a=>a.systemId===selectedSystem.id);
+          const size = 320, center = size/2, maxRadius = center - 30;
+          const ringCount = sysPlanets.length + sysBelts.length;
+          const ringStep = ringCount > 0 ? maxRadius / (ringCount + 1) : maxRadius;
+          const selectedPlanetObj = sysPlanets.find(p=>p.id===selectedPlanetId);
+          return (
+            <div>
+              {selectedSystem.starDescription && <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>{selectedSystem.starDescription}</div>}
+              <svg width="100%" viewBox={"0 0 "+size+" "+size} style={{background:'#05070d',borderRadius:4,maxWidth:400,display:'block',margin:'0 auto'}}>
+                {Array.from({length: ringCount}).map((_,i) => (
+                  <circle key={i} cx={center} cy={center} r={ringStep*(i+1)} fill="none" stroke="var(--border)" strokeWidth="1" opacity="0.4" />
+                ))}
+                <circle cx={center} cy={center} r="14" fill="var(--amber)" opacity="0.9" />
+                <text x={center} y={center+30} fontSize="9" fill="var(--amber)" textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{selectedSystem.starName || 'Unnamed Star'}</text>
+                {sysPlanets.map((p, i) => {
+                  const r = ringStep*(i+1);
+                  const angle = (i * 137.5) % 360;
+                  const rad = angle * Math.PI/180;
+                  const x = center + r*Math.cos(rad);
+                  const y = center + r*Math.sin(rad);
+                  const status = planetStatusById(p.id, campaigns, logs);
+                  const color = status.detail==='success' ? 'var(--success)' : (status.detail==='active'||status.detail==='recruiting') ? 'var(--amber)' : status.detail==='failed' ? 'var(--threat)' : 'var(--text-dim)';
+                  return (
+                    <g key={p.id} style={{cursor:'pointer'}} onClick={()=>setSelectedPlanetId(p.id)}>
+                      <circle cx={x} cy={y} r="8" fill={color} stroke={selectedPlanetId===p.id?'#fff':'none'} strokeWidth="1.5" />
+                      <text x={x} y={y+18} fontSize="8" fill={color} textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{p.name}</text>
+                    </g>
+                  );
+                })}
+                {sysBelts.map((a, i) => (
+                  <circle key={a.id} cx={center} cy={center} r={ringStep*(sysPlanets.length+i+1)} fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeDasharray="2,4" opacity="0.6" />
+                ))}
+              </svg>
+
+              {selectedPlanetObj ? (() => {
+                const status = planetStatusById(selectedPlanetObj.id, campaigns, logs);
+                const planetMoons = moons.filter(m=>m.planetId===selectedPlanetObj.id);
+                return (
+                  <div className="protocol-card" style={{marginTop:14}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{selectedPlanetObj.name}</div>
+                      <span className="pill" style={{fontSize:10}}>{status.label}</span>
+                    </div>
+                    <div className="dim" style={{fontSize:11,marginTop:4}}>{selectedPlanetObj.description}</div>
+                    {planetMoons.length > 0 && <div className="dim mono" style={{fontSize:10,marginTop:6}}>Moons: {planetMoons.map(m=>m.name).join(', ')}</div>}
+                    {status.campaign && (status.detail==='active'||status.detail==='recruiting') && (
+                      <button className="primary small" style={{marginTop:8}} onClick={onGoCampaigns}>View Campaign</button>
+                    )}
                   </div>
-                  <div className="dim" style={{fontSize:11,marginTop:4}}>{p.description}</div>
-                  {planetMoons.length > 0 && <div className="dim mono" style={{fontSize:10,marginTop:6}}>Moons: {planetMoons.map(m=>m.name).join(', ')}</div>}
-                  {status.campaign && (status.detail==='active'||status.detail==='recruiting') && (
-                    <button className="primary small" style={{marginTop:8}} onClick={onGoCampaigns}>View Campaign</button>
-                  )}
+                );
+              })() : (
+                <div className="dim" style={{fontSize:11,marginTop:14,textAlign:'center'}}>Click a world to view its details.</div>
+              )}
+
+              {sysBelts.map(a => (
+                <div key={a.id} className="protocol-card" style={{marginTop:10}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{a.name}</div>
+                  <div className="dim" style={{fontSize:11,marginTop:4}}>{a.description}</div>
                 </div>
-              );
-            })}
-            {asteroidBelts.filter(a=>a.systemId===selectedSystem.id).map(a => (
-              <div key={a.id} className="protocol-card" style={{marginBottom:10}}>
-                <div style={{fontWeight:600,fontSize:13}}>{a.name}</div>
-                <div className="dim" style={{fontSize:11,marginTop:4}}>{a.description}</div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
