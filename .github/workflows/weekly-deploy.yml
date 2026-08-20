@@ -1,0 +1,18 @@
+name: Weekly Netlify Deploy
+
+on:
+  schedule:
+    # Every Monday at 00:00 UTC — adjust the cron expression to change
+    # the day/time (crontab.guru is a good tool for building these).
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    # Lets you manually trigger a deploy anytime from the GitHub Actions
+    # tab, without waiting for the schedule — useful for testing this
+    # workflow and for the rare week you need an off-schedule push.
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify Build Hook
+        run: curl -X POST -d '{}' "${{ secrets.NETLIFY_BUILD_HOOK_URL }}"
