@@ -46,43 +46,34 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
 
   return (
     <div>
-      <GettingStartedChecklist op={activeOp} logs={logs} />
       {notifications.map(n => (
         <div key={n.id} className="panel" style={{borderColor: n.severity==='urgent'?'var(--threat)':n.severity==='warning'?'var(--amber)':'var(--border)', padding:'12px 16px', marginBottom:12}}>
           <div style={{fontSize:12, color: n.severity==='urgent'?'var(--threat)':'var(--amber)'}}>{n.text}</div>
         </div>
       ))}
+      <GettingStartedChecklist op={activeOp} logs={logs} />
+
       <div className="panel">
-        <div className="bracket-label">Sitrep — {todayStr()}</div>
-        <div style={{fontSize:14,marginBottom:8}}>
+        <div className="bracket-label">Operator Status — {activeOp.callsign}</div>
+        <div style={{fontSize:13,marginBottom:12}}>
           {loggedToday ? `Good work today, ${activeOp.callsign}.` : `Command hasn't seen you log anything today yet, ${activeOp.callsign}.`}
           {streak > 0 && <span> Current streak: <span className="amber mono">{streak} day{streak===1?'':'s'}</span>.</span>}
+          {quip && <span style={{color:'var(--text-dim)',fontStyle:'italic'}}> "{quip}"</span>}
         </div>
-        {quip && <div style={{fontSize:12,color:'var(--text-dim)',fontStyle:'italic'}}>"{quip}"</div>}
+        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:12}}>
+          <RankInsignia rank={commandRank ? commandRank.rank : rank} tier={commandRank ? commandRank.tier : rankTier} size={44} />
+          {activeOp.specialization && <SpecialtyBadge specialization={activeOp.specialization} size={40} />}
+        </div>
+        <div className="stat-row"><span>Rank</span><span className="pill rank">{commandRank ? commandRankDisplay(commandRank) : rankDisplay(rank, rankTier)}</span></div>
+        <div className="stat-row"><span>Readiness (ORS)</span><span className="stat-val">{orsData.ors} / 100</span></div>
+        <div className="stat-row"><span>Status</span><span className={"status-pill "+status.cls}>{status.label}</span></div>
+        <div className="sub-bars">
+          <SubBar label="Physical Capability" val={orsData.physical} />
+          <SubBar label="Mission Discipline" val={orsData.discipline} />
+          <SubBar label="Personal Development" val={orsData.personalDev} />
+          <SubBar label="Squad Contribution" val={orsData.squad} />
+        </div>
       </div>
-
-      <div className="panel">
-        <div className="bracket-label">War Progress — All Campaigns, All Time</div>
-        <div className="bar-track" style={{height:10}}><div className="bar-fill" style={{width:warProgress.pct+'%', background: warProgress.pct>=50?'var(--success)':'var(--threat)'}}></div></div>
-        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginTop:6}}>
-          <span className="dim">{warProgress.won} Won · {warProgress.lost} Lost · {warProgress.resolved} Concluded</span>
-          <span className="mono">{Math.round(warProgress.pct)}%</span>
-        </div>
-        <div style={{fontSize:12,color:'var(--text-dim)',fontStyle:'italic',marginTop:8}}>{warProgressLine(warProgress)}</div>
-      </div>
-
-      {todayChallenge && (
-        <div className="panel" style={{borderColor: challengeDone ? 'var(--success)' : 'var(--border)'}}>
-          <div className="bracket-label">Daily Challenge{challengeDone ? ' — Complete' : ''}</div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div className="disp" style={{fontSize:16}}>{todayChallenge.name}</div>
-            {challengeDone && <span style={{fontSize:18}}>✅</span>}
-          </div>
-          <div className="dim mono" style={{fontSize:11,marginBottom:8}}>{todayChallenge.muscleGroup} · {challengeProgress.total} / {challengeProgress.target} {todayChallenge.unit}</div>
-          <div className="bar-track"><div className="bar-fill" style={{width:challengeProgress.pct+'%', background: challengeDone?'var(--success)':'var(--amber)'}}></div></div>
-          {!challengeDone && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:8}}>Resets at midnight. Log any {todayChallenge.muscleGroup} work today to fill this in.</div>}
-        </div>
-      )}
 
       {deployedCampaign ? (
         <div className="panel">
@@ -131,29 +122,34 @@ function CommandCenter({ operators, campaigns, logs, activeOp, deployedCampaign,
         </div>
       )}
 
-      <div className="grid2">
-        <div className="panel">
-          <div className="bracket-label">Operator Status — {activeOp.callsign}</div>
-          <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:12}}>
-            <RankInsignia rank={commandRank ? commandRank.rank : rank} tier={commandRank ? commandRank.tier : rankTier} size={44} />
-            {activeOp.specialization && <SpecialtyBadge specialization={activeOp.specialization} size={40} />}
+      {todayChallenge && (
+        <div className="panel" style={{borderColor: challengeDone ? 'var(--success)' : 'var(--border)'}}>
+          <div className="bracket-label">Daily Challenge{challengeDone ? ' — Complete' : ''}</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <div className="disp" style={{fontSize:16}}>{todayChallenge.name}</div>
+            {challengeDone && <span style={{fontSize:18}}>✅</span>}
           </div>
-          <div className="stat-row"><span>Rank</span><span className="pill rank">{commandRank ? commandRankDisplay(commandRank) : rankDisplay(rank, rankTier)}</span></div>
-          <div className="stat-row"><span>Readiness (ORS)</span><span className="stat-val">{orsData.ors} / 100</span></div>
-          <div className="stat-row"><span>Status</span><span className={"status-pill "+status.cls}>{status.label}</span></div>
-          <div className="sub-bars">
-            <SubBar label="Physical Capability" val={orsData.physical} />
-            <SubBar label="Mission Discipline" val={orsData.discipline} />
-            <SubBar label="Personal Development" val={orsData.personalDev} />
-            <SubBar label="Squad Contribution" val={orsData.squad} />
-          </div>
+          <div className="dim mono" style={{fontSize:11,marginBottom:8}}>{todayChallenge.muscleGroup} · {challengeProgress.total} / {challengeProgress.target} {todayChallenge.unit}</div>
+          <div className="bar-track"><div className="bar-fill" style={{width:challengeProgress.pct+'%', background: challengeDone?'var(--success)':'var(--amber)'}}></div></div>
+          {!challengeDone && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:8}}>Resets at midnight. Log any {todayChallenge.muscleGroup} work today to fill this in.</div>}
         </div>
-        <div className="panel">
-          <div className="bracket-label">Quick Reference</div>
-          <div className="dim" style={{fontSize:12,lineHeight:1.8}}>
-            One Campaign deployment at a time. First log per Location per day counts 1:1; additional logs same day count at 50%.<br/><br/>
-            Status now reflects your logging frequency over time, not just whether you logged something recently.
-          </div>
+      )}
+
+      <div className="panel">
+        <div className="bracket-label">War Progress — All Campaigns, All Time</div>
+        <div className="bar-track" style={{height:10}}><div className="bar-fill" style={{width:warProgress.pct+'%', background: warProgress.pct>=50?'var(--success)':'var(--threat)'}}></div></div>
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginTop:6}}>
+          <span className="dim">{warProgress.won} Won · {warProgress.lost} Lost · {warProgress.resolved} Concluded</span>
+          <span className="mono">{Math.round(warProgress.pct)}%</span>
+        </div>
+        <div style={{fontSize:12,color:'var(--text-dim)',fontStyle:'italic',marginTop:8}}>{warProgressLine(warProgress)}</div>
+      </div>
+
+      <div className="panel">
+        <div className="bracket-label">Quick Reference</div>
+        <div className="dim" style={{fontSize:12,lineHeight:1.8}}>
+          One Campaign deployment at a time. First log per Location per day counts 1:1; additional logs same day count at 50%.<br/><br/>
+          Status now reflects your logging frequency over time, not just whether you logged something recently.
         </div>
         <div style={{textAlign:'center',padding:'8px 0'}}>
           <a href="https://ko-fi.com/leidolflokison" target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'var(--text-dim)',textDecoration:'none',opacity:0.7}}>
@@ -263,7 +259,7 @@ function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
       <div className="panel">
         <div className="bracket-label">Daily Habits</div>
         <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:16}}>Habits feed the Personal Development slice of your ORS.</div>
-        {active.length === 0 && <div className="empty"><div className="empty-title">No active habits yet.</div></div>}
+        {active.length === 0 && <div className="empty"><div className="empty-title">No active Habits yet — add one below to start building your Personal Development score.</div></div>}
         {active.map(h => {
           const checkedToday = logs.some(l=>l.type==='habit' && l.operatorId===op.id && l.habitId===h.id && l.date===todayStr());
           const catStyle = habitCategoryStyle(h.category);
@@ -299,6 +295,7 @@ function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
             </div>
           </div>
           {weekView === 'week' ? (
+            <div style={{overflowX:'auto'}}>
             <table>
               <thead>
                 <tr>
@@ -324,6 +321,7 @@ function Habits({ op, logs, onAddHabit, onToggleArchive, onCheckin }) {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <div>
               <div className="dim" style={{fontSize:11,marginBottom:10}}>Combined completion rate across all active habits, per day. Brighter = more of that day's habits checked in.</div>
@@ -396,7 +394,7 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
         </div>
         <div className="panel">
           <div className="bracket-label">Browse Squads</div>
-          {squads.length === 0 && <div className="empty"><div className="empty-title">No squads exist yet.</div></div>}
+          {squads.length === 0 && <div className="empty"><div className="empty-title">No Squads exist yet — be the first to create one below.</div></div>}
           {squads.map(s => {
             const stats = squadStats(s, operators, campaigns, logs, currentSeason);
             const full = stats.memberCount >= 10;
@@ -567,7 +565,7 @@ function SquadTab({ activeOp, operators, squads, logs, campaigns, onCreate, onRe
             })() : (
               <div className="panel">
                 <div className="bracket-label">Available Raids</div>
-                {availableTemplates.length === 0 && <div className="dim" style={{fontSize:12}}>No raids have been created yet.</div>}
+                {availableTemplates.length === 0 && <div className="dim" style={{fontSize:12}}>No Raids available yet — Command hasn't deployed one. Check back soon.</div>}
                 {availableTemplates.map(t => (
                   <div key={t.id} className="protocol-card">
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -805,15 +803,16 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
   const [selectedQuadrantId, setSelectedQuadrantId] = useState(null);
   const [selectedSectorId, setSelectedSectorId] = useState(null);
   const [selectedSystemId, setSelectedSystemId] = useState(null);
+  const [selectedPlanetId, setSelectedPlanetId] = useState(null);
 
   const selectedQuadrant = quadrants.find(q=>q.id===selectedQuadrantId);
   const selectedSector = sectors.find(s=>s.id===selectedSectorId);
   const selectedSystem = systems.find(s=>s.id===selectedSystemId);
 
-  function goQuadrants() { setLevel('quadrants'); setSelectedQuadrantId(null); setSelectedSectorId(null); setSelectedSystemId(null); }
-  function goSectorGrid(qId) { setLevel('sector-grid'); setSelectedQuadrantId(qId); setSelectedSectorId(null); setSelectedSystemId(null); }
-  function goSectorDetail(sId) { setLevel('sector-detail'); setSelectedSectorId(sId); setSelectedSystemId(null); }
-  function goSystemDetail(sysId) { setLevel('system-detail'); setSelectedSystemId(sysId); }
+  function goQuadrants() { setLevel('quadrants'); setSelectedQuadrantId(null); setSelectedSectorId(null); setSelectedSystemId(null); setSelectedPlanetId(null); }
+  function goSectorGrid(qId) { setLevel('sector-grid'); setSelectedQuadrantId(qId); setSelectedSectorId(null); setSelectedSystemId(null); setSelectedPlanetId(null); }
+  function goSectorDetail(sId) { setLevel('sector-detail'); setSelectedSectorId(sId); setSelectedSystemId(null); setSelectedPlanetId(null); }
+  function goSystemDetail(sysId) { setLevel('system-detail'); setSelectedSystemId(sysId); setSelectedPlanetId(null); }
 
   return (
     <div>
@@ -827,15 +826,18 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
         </div>
 
         {level === 'quadrants' && (
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,maxWidth:480}}>
+          <div style={{position:'relative', maxWidth:480, aspectRatio:'1', margin:'0 auto',
+              background:"radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.35), transparent), radial-gradient(1px 1px at 40% 55%, rgba(255,255,255,0.25), transparent), radial-gradient(1px 1px at 70% 15%, rgba(255,255,255,0.3), transparent), radial-gradient(1px 1px at 85% 65%, rgba(255,255,255,0.2), transparent), radial-gradient(1px 1px at 25% 80%, rgba(255,255,255,0.25), transparent), radial-gradient(1px 1px at 60% 85%, rgba(255,255,255,0.18), transparent), #05070d",
+              border:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr', gridTemplateRows:'1fr 1fr'}}>
             {['Alpha','Beta','Gamma','Delta'].map(qName => {
               const q = quadrants.find(x=>x.name===qName);
               if (!q) return null;
               const qSectors = sectors.filter(s=>s.quadrantId===q.id);
               const knownCount = qSectors.filter(s=>s.known).length;
+              const tint = {Alpha:'rgba(124,169,232,0.07)', Beta:'rgba(181,126,220,0.07)', Gamma:'rgba(111,207,151,0.07)', Delta:'rgba(242,201,76,0.09)'}[qName];
               return (
-                <div key={q.id} className="protocol-card" style={{cursor:'pointer',textAlign:'center',padding:'24px 12px'}} onClick={()=>goSectorGrid(q.id)}>
-                  <div className="disp" style={{fontSize:18}}>{q.name}</div>
+                <div key={q.id} style={{cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:tint,border:'1px solid var(--border)'}} onClick={()=>goSectorGrid(q.id)}>
+                  <div className="disp" style={{fontSize:22}}>{q.name}</div>
                   <div className="dim mono" style={{fontSize:10,marginTop:4}}>{knownCount} of 9 Sectors documented</div>
                 </div>
               );
@@ -844,21 +846,30 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
         )}
 
         {level === 'sector-grid' && selectedQuadrant && (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8,maxWidth:340}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:4,maxWidth:340}}>
             {[1,2,3,4,5,6,7,8,9].map(num => {
               const sec = sectors.find(s=>s.quadrantId===selectedQuadrant.id && s.sectorNumber===num);
               if (sec && sec.known) {
+                const isHome = sec.code === 'Delta-1';
                 return (
-                  <div key={num} className="protocol-card" style={{cursor:'pointer',textAlign:'center',padding:'14px 6px'}} onClick={()=>goSectorDetail(sec.id)}>
-                    <div style={{fontSize:11,fontWeight:600}}>{sec.name}</div>
+                  <div key={num} style={{
+                      cursor:'pointer',textAlign:'center',padding:'16px 6px',borderRadius:2,
+                      background: isHome ? 'rgba(57,255,20,0.12)' : 'rgba(242,201,76,0.08)',
+                      border:'1px solid '+(isHome?'var(--success)':'var(--amber-dim)'),
+                      boxShadow: '0 0 12px '+(isHome?'rgba(57,255,20,0.25)':'rgba(242,201,76,0.15)'),
+                    }} onClick={()=>goSectorDetail(sec.id)}>
+                    <div style={{fontSize:11,fontWeight:600,color: isHome?'var(--success)':'var(--text)'}}>{sec.name}</div>
                     <div className="dim mono" style={{fontSize:9}}>{sec.code}</div>
                   </div>
                 );
               }
               return (
-                <div key={num} style={{border:'1px dashed var(--border)',borderRadius:2,textAlign:'center',padding:'14px 6px',opacity:0.4}}>
-                  <div className="dim" style={{fontSize:10}}>Undocumented</div>
-                  <div className="dim mono" style={{fontSize:9}}>{selectedQuadrant.name}-{num}</div>
+                <div key={num} style={{
+                    textAlign:'center',padding:'16px 6px',borderRadius:2,
+                    background:'repeating-linear-gradient(45deg, #0A0C0A, #0A0C0A 4px, #14170F 4px, #14170F 8px)',
+                    border:'1px solid var(--border)', opacity:0.5,
+                  }}>
+                  <div className="dim mono" style={{fontSize:11}}>{'\u2591\u2591\u2591'}</div>
                 </div>
               );
             })}
@@ -888,55 +899,93 @@ function GalaxyMap({ entries, campaigns, logs, onGoCampaigns, quadrants, sectors
           </div>
         )}
 
-        {level === 'system-detail' && selectedSystem && (
-          <div>
-            {selectedSystem.starDescription && <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>{selectedSystem.starDescription}</div>}
-            {planets.filter(p=>p.systemId===selectedSystem.id).sort((a,b)=>(a.orderIndex||0)-(b.orderIndex||0)).map(p => {
-              const status = planetStatusById(p.id, campaigns, logs);
-              const planetMoons = moons.filter(m=>m.planetId===p.id);
-              return (
-                <div key={p.id} className="protocol-card" style={{marginBottom:10}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
-                    <span className="pill" style={{fontSize:10}}>{status.label}</span>
+        {level === 'system-detail' && selectedSystem && (() => {
+          const sysPlanets = planets.filter(p=>p.systemId===selectedSystem.id).sort((a,b)=>(a.orderIndex||0)-(b.orderIndex||0));
+          const sysBelts = asteroidBelts.filter(a=>a.systemId===selectedSystem.id);
+          const size = 320, center = size/2, maxRadius = center - 30;
+          const ringCount = sysPlanets.length + sysBelts.length;
+          const ringStep = ringCount > 0 ? maxRadius / (ringCount + 1) : maxRadius;
+          const selectedPlanetObj = sysPlanets.find(p=>p.id===selectedPlanetId);
+          return (
+            <div>
+              {selectedSystem.starDescription && <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>{selectedSystem.starDescription}</div>}
+              <svg width="100%" viewBox={"0 0 "+size+" "+size} style={{background:'#05070d',borderRadius:4,maxWidth:400,display:'block',margin:'0 auto'}}>
+                {Array.from({length: ringCount}).map((_,i) => (
+                  <circle key={i} cx={center} cy={center} r={ringStep*(i+1)} fill="none" stroke="var(--border)" strokeWidth="1" opacity="0.4" />
+                ))}
+                <circle cx={center} cy={center} r="14" fill="var(--amber)" opacity="0.9" />
+                <text x={center} y={center+30} fontSize="9" fill="var(--amber)" textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{selectedSystem.starName || 'Unnamed Star'}</text>
+                {sysPlanets.map((p, i) => {
+                  const r = ringStep*(i+1);
+                  const angle = (i * 137.5) % 360;
+                  const rad = angle * Math.PI/180;
+                  const x = center + r*Math.cos(rad);
+                  const y = center + r*Math.sin(rad);
+                  const status = planetStatusById(p.id, campaigns, logs);
+                  const color = status.detail==='success' ? 'var(--success)' : (status.detail==='active'||status.detail==='recruiting') ? 'var(--amber)' : status.detail==='failed' ? 'var(--threat)' : 'var(--text-dim)';
+                  return (
+                    <g key={p.id} style={{cursor:'pointer'}} onClick={()=>setSelectedPlanetId(p.id)}>
+                      <circle cx={x} cy={y} r="8" fill={color} stroke={selectedPlanetId===p.id?'#fff':'none'} strokeWidth="1.5" />
+                      <text x={x} y={y+18} fontSize="8" fill={color} textAnchor="middle" fontFamily="'IBM Plex Mono',monospace">{p.name}</text>
+                    </g>
+                  );
+                })}
+                {sysBelts.map((a, i) => (
+                  <circle key={a.id} cx={center} cy={center} r={ringStep*(sysPlanets.length+i+1)} fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeDasharray="2,4" opacity="0.6" />
+                ))}
+              </svg>
+
+              {selectedPlanetObj ? (() => {
+                const status = planetStatusById(selectedPlanetObj.id, campaigns, logs);
+                const planetMoons = moons.filter(m=>m.planetId===selectedPlanetObj.id);
+                return (
+                  <div className="protocol-card" style={{marginTop:14}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{selectedPlanetObj.name}</div>
+                      <span className="pill" style={{fontSize:10}}>{status.label}</span>
+                    </div>
+                    <div className="dim" style={{fontSize:11,marginTop:4}}>{selectedPlanetObj.description}</div>
+                    {planetMoons.length > 0 && <div className="dim mono" style={{fontSize:10,marginTop:6}}>Moons: {planetMoons.map(m=>m.name).join(', ')}</div>}
+                    {status.campaign && (status.detail==='active'||status.detail==='recruiting') && (
+                      <button className="primary small" style={{marginTop:8}} onClick={onGoCampaigns}>View Campaign</button>
+                    )}
                   </div>
-                  <div className="dim" style={{fontSize:11,marginTop:4}}>{p.description}</div>
-                  {planetMoons.length > 0 && <div className="dim mono" style={{fontSize:10,marginTop:6}}>Moons: {planetMoons.map(m=>m.name).join(', ')}</div>}
-                  {status.campaign && (status.detail==='active'||status.detail==='recruiting') && (
-                    <button className="primary small" style={{marginTop:8}} onClick={onGoCampaigns}>View Campaign</button>
-                  )}
+                );
+              })() : (
+                <div className="dim" style={{fontSize:11,marginTop:14,textAlign:'center'}}>Click a world to view its details.</div>
+              )}
+
+              {sysBelts.map(a => (
+                <div key={a.id} className="protocol-card" style={{marginTop:10}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{a.name}</div>
+                  <div className="dim" style={{fontSize:11,marginTop:4}}>{a.description}</div>
                 </div>
-              );
-            })}
-            {asteroidBelts.filter(a=>a.systemId===selectedSystem.id).map(a => (
-              <div key={a.id} className="protocol-card" style={{marginBottom:10}}>
-                <div style={{fontWeight:600,fontSize:13}}>{a.name}</div>
-                <div className="dim" style={{fontSize:11,marginTop:4}}>{a.description}</div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
 }
 
 function Codex({ entries, isAdmin, onUpdate }) {
-  const categories = ['Lore','Planets','Enemies','Characters','Field Guide','Philosophy'];
+  const categories = ['Lore','Enemies','Characters','Field Guide','Philosophy'];
   const [activeCat, setActiveCat] = useState('Lore');
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({title:'',body:'',iconRef:''});
   const [adding, setAdding] = useState(false);
 
-  function startEdit(entry) { setEditingId(entry.id); setDraft({title:entry.title, body:entry.body, iconRef:entry.iconRef||''}); }
+  function startEdit(entry) { setEditingId(entry.id); setDraft({title:entry.title, body:entry.body, iconRef:entry.iconRef||'', category:entry.category, bannerRef:entry.bannerRef||''}); }
   function saveEdit() {
     onUpdate(entries.map(e => e.id===editingId ? Object.assign({}, e, draft) : e));
     setEditingId(null);
+    if (draft.category && draft.category !== activeCat) setActiveCat(draft.category);
   }
   function saveNew() {
     if (!draft.title.trim()) return;
-    onUpdate(entries.concat([{id:'codex_'+Date.now(), category:activeCat, title:draft.title, body:draft.body, iconRef:draft.iconRef}]));
-    setDraft({title:'',body:'',iconRef:''}); setAdding(false);
+    onUpdate(entries.concat([{id:'codex_'+Date.now(), category:activeCat, title:draft.title, body:draft.body, iconRef:draft.iconRef, bannerRef:draft.bannerRef||''}]));
+    setDraft({title:'',body:'',iconRef:'',bannerRef:''}); setAdding(false);
   }
   function deleteEntry(id) { onUpdate(entries.filter(e=>e.id!==id)); }
 
@@ -948,14 +997,29 @@ function Codex({ entries, isAdmin, onUpdate }) {
       <div className="codex-cat-tabs">
         {categories.map(c => <button key={c} className={activeCat===c?'primary small':'ghost small'} onClick={()=>{setActiveCat(c); setEditingId(null); setAdding(false);}}>{c}</button>)}
       </div>
-      {shown.length === 0 && <div className="empty"><div className="empty-title">No entries in {activeCat} yet.</div></div>}
+      {shown.length === 0 && <div className="empty"><div className="empty-title">No entries in {activeCat} yet{isAdmin ? ' — add the first one below.' : '.'}</div></div>}
       {shown.map(entry => (
         <div key={entry.id} className="codex-entry">
           {editingId === entry.id ? (
             <div>
               <input type="text" value={draft.title} onChange={e=>setDraft(Object.assign({},draft,{title:e.target.value}))} style={{marginBottom:8}} />
               <textarea value={draft.body} onChange={e=>setDraft(Object.assign({},draft,{body:e.target.value}))} rows="4" style={{width:'100%',marginBottom:8}} />
-              <input type="text" value={draft.iconRef} onChange={e=>setDraft(Object.assign({},draft,{iconRef:e.target.value}))} placeholder="Icon refs, e.g. rank:Operator:2,specialty:Recon,award:streak_30" style={{marginBottom:8}} />
+              <input type="text" value={draft.iconRef} onChange={e=>setDraft(Object.assign({},draft,{iconRef:e.target.value}))} placeholder="Icon refs, e.g. rank:Operator:2,specialty:Recon,award:streak_30,enemy:kharvax,character:kilo,vanguard" style={{marginBottom:8}} />
+              <div className="field"><label>Category</label>
+                <select value={draft.category} onChange={e=>setDraft(Object.assign({},draft,{category:e.target.value}))}>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>Banner</label>
+                <select value={draft.bannerRef||''} onChange={e=>setDraft(Object.assign({},draft,{bannerRef:e.target.value}))}>
+                  <option value="">None</option>
+                  <option value="kharvax">Kharvax Swarm</option>
+                  <option value="voss">Voss Directorate</option>
+                  <option value="skarn">Skarn Collective</option>
+                  <option value="renders">The Renders</option>
+                  <option value="vanguard">Vanguard Initiative</option>
+                </select>
+              </div>
               <div style={{display:'flex',gap:8}}>
                 <button className="primary small" onClick={saveEdit}>Save</button>
                 <button className="ghost small" onClick={()=>setEditingId(null)}>Cancel</button>
@@ -963,6 +1027,7 @@ function Codex({ entries, isAdmin, onUpdate }) {
             </div>
           ) : (
             <div>
+              <CodexBanner bannerRef={entry.bannerRef} />
               <div className="codex-entry-head">
                 <div className="disp amber" style={{fontSize:15}}>{entry.title}</div>
                 {isAdmin && <span style={{display:'flex',gap:6,flexShrink:0}}>
@@ -976,12 +1041,22 @@ function Codex({ entries, isAdmin, onUpdate }) {
           )}
         </div>
       ))}
-      {isAdmin && !adding && <button className="ghost small" onClick={()=>{setAdding(true); setDraft({title:'',body:'',iconRef:''});}}>+ Add {activeCat} Entry</button>}
+      {isAdmin && !adding && <button className="ghost small" onClick={()=>{setAdding(true); setDraft({title:'',body:'',iconRef:'',bannerRef:''});}}>+ Add {activeCat} Entry</button>}
       {isAdmin && adding && (
         <div className="codex-entry">
           <input type="text" value={draft.title} onChange={e=>setDraft(Object.assign({},draft,{title:e.target.value}))} placeholder="Title" style={{marginBottom:8}} />
           <textarea value={draft.body} onChange={e=>setDraft(Object.assign({},draft,{body:e.target.value}))} placeholder="Body text" rows="4" style={{width:'100%',marginBottom:8}} />
-          <input type="text" value={draft.iconRef} onChange={e=>setDraft(Object.assign({},draft,{iconRef:e.target.value}))} placeholder="Icon refs, e.g. rank:Operator:2,specialty:Recon,award:streak_30" style={{marginBottom:8}} />
+          <input type="text" value={draft.iconRef} onChange={e=>setDraft(Object.assign({},draft,{iconRef:e.target.value}))} placeholder="Icon refs, e.g. rank:Operator:2,specialty:Recon,award:streak_30,enemy:kharvax,character:kilo,vanguard" style={{marginBottom:8}} />
+          <div className="field"><label>Banner</label>
+            <select value={draft.bannerRef||''} onChange={e=>setDraft(Object.assign({},draft,{bannerRef:e.target.value}))}>
+              <option value="">None</option>
+              <option value="kharvax">Kharvax Swarm</option>
+              <option value="voss">Voss Directorate</option>
+              <option value="skarn">Skarn Collective</option>
+              <option value="renders">The Renders</option>
+              <option value="vanguard">Vanguard Initiative</option>
+            </select>
+          </div>
           <div style={{display:'flex',gap:8}}>
             <button className="primary small" onClick={saveNew}>Add Entry</button>
             <button className="ghost small" onClick={()=>setAdding(false)}>Cancel</button>
@@ -1024,7 +1099,7 @@ function MyProtocols({ op, onSave, onDelete, exercises }) {
       <div className="panel">
         <div className="bracket-label">My Protocols — Custom Sessions ({custom.length}/{cap})</div>
         <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:16}}>Build your own session templates using any exercise in the library. Log against them the same way as built-in Protocol sessions.</div>
-        {custom.length === 0 && <div className="empty"><div className="empty-title">No custom Protocols yet.</div></div>}
+        {custom.length === 0 && <div className="empty"><div className="empty-title">No custom Protocols yet — build one to save your own training template.</div></div>}
         {custom.map(p => (
           <div key={p.id} className="protocol-card">
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1077,4 +1152,3 @@ function lastLoggedExercise(operatorId, logs, exerciseName) {
   if (prior.length === 0) return null;
   return prior.reduce((a,b) => (b.timestamp > a.timestamp ? b : a));
 }
-
