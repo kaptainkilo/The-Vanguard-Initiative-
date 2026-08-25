@@ -503,6 +503,7 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
       <div className="panel">
         <div className="bracket-label">Admin — Roster Management</div>
         <div className="info-note" style={{marginBottom:12}}>Toggling Admin or Mod automatically sets the operator's rank to Command Staff or Jr Command Staff — these are conferred by role, not chosen. Admin takes precedence if both are checked.</div>
+        <div style={{overflowX:'auto'}}>
         <table>
           <thead><tr><th>Callsign</th><th>Weekly Target</th><th>Age Division</th><th>Birthdate</th><th>Admin</th><th>Mod</th><th>Command Rank</th><th></th><th></th></tr></thead>
           <tbody>
@@ -525,6 +526,7 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
             ))}
           </tbody>
         </table>
+        </div>
         {grantAwardFor && (
           <div style={{border:'1px solid var(--amber)',borderRadius:2,padding:12,marginTop:14}}>
             <div style={{fontSize:12,marginBottom:8}}>Granting an award to <strong>{(operators.find(o=>o.id===grantAwardFor)||{}).callsign}</strong></div>
