@@ -160,8 +160,8 @@ function App() {
     for (const r of removed) await sb.from('codex_entries').delete().eq('id', r.id);
     for (const e of newEntries) {
       const oldE = old.find(x=>x.id===e.id);
-      if (!oldE) await sb.from('codex_entries').insert({ category: e.category, title: e.title, body: e.body, icon_ref: e.iconRef||null });
-      else if (oldE.title!==e.title || oldE.body!==e.body || oldE.iconRef!==e.iconRef || oldE.category!==e.category) await sb.from('codex_entries').update({title:e.title, body:e.body, icon_ref: e.iconRef||null, category:e.category}).eq('id', e.id);
+      if (!oldE) await sb.from('codex_entries').insert({ category: e.category, title: e.title, body: e.body, icon_ref: e.iconRef||null, banner_ref: e.bannerRef||null });
+      else if (oldE.title!==e.title || oldE.body!==e.body || oldE.iconRef!==e.iconRef || oldE.category!==e.category || oldE.bannerRef!==e.bannerRef) await sb.from('codex_entries').update({title:e.title, body:e.body, icon_ref: e.iconRef||null, category:e.category, banner_ref: e.bannerRef||null}).eq('id', e.id);
     }
     await refetchAll();
   }
@@ -752,4 +752,3 @@ function App() {
     </div>
   );
 }
-
