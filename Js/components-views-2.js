@@ -613,6 +613,7 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
         {myPRs.length === 0 ? (
           <div className="dim" style={{fontSize:12}}>No personal records logged yet — beat your own best on any exercise to start one.</div>
         ) : (
+          <div style={{overflowX:'auto'}}>
           <table>
             <thead><tr><th>Exercise</th><th>Best</th><th>Date</th></tr></thead>
             <tbody>
@@ -624,6 +625,7 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -695,6 +697,7 @@ function Roster({ operators, campaigns, logs, onView }) {
   return (
     <div className="panel">
       <div className="bracket-label">Alpha Cell — Roster</div>
+      <div style={{overflowX:'auto'}}>
       <table>
         <thead><tr><th>Callsign</th><th>Rank</th><th>ORS</th><th>Status</th><th>Deployed To</th><th>Last Active</th></tr></thead>
         <tbody>
@@ -720,6 +723,7 @@ function Roster({ operators, campaigns, logs, onView }) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -729,10 +733,11 @@ function AARLog({ operators, campaigns, logs }) {
   const opName = id => { const o = operators.find(o=>o.id===id); return o ? o.callsign : id; };
   const locName = (campId, locId) => { const c = campaigns.find(c=>c.id===campId); if(!c) return locId; const l = c.locations.find(l=>l.id===locId); return l ? l.name : locId; };
   const habitName = (op, habitId) => { const o = operators.find(o=>o.id===op); if(!o) return habitId; const h=(o.habits||[]).find(h=>h.id===habitId); return h?h.name:habitId; };
-  if (sorted.length === 0) return <div className="panel"><div className="empty"><div className="empty-title">No AARs filed yet.</div></div></div>;
+  if (sorted.length === 0) return <div className="panel"><div className="empty"><div className="empty-title">No AARs filed yet — your training log will show up here once you log your first session.</div></div></div>;
   return (
     <div className="panel">
       <div className="bracket-label">After Action Reports — Full Log</div>
+      <div style={{overflowX:'auto'}}>
       <table>
         <thead><tr><th>Date</th><th>Operator</th><th>Type</th><th>Detail</th><th>Value</th></tr></thead>
         <tbody>
@@ -747,6 +752,7 @@ function AARLog({ operators, campaigns, logs }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -788,7 +794,7 @@ function Comms({ chat, operators, squads, activeOp, onSend, cheers, onCheer }) {
       </div>
 
       <div className="chat-scroll" ref={scrollRef}>
-        {shown.length === 0 && <div className="empty"><div className="empty-title">No transmissions yet.</div></div>}
+        {shown.length === 0 && <div className="empty"><div className="empty-title">No transmissions yet — say something below to break the silence.</div></div>}
         {shown.map(m => {
           const msgCheers = (cheers||[]).filter(c=>c.messageId===m.id);
           const iCheered = msgCheers.some(c=>c.operatorId===activeOp.id);
@@ -821,4 +827,3 @@ function Comms({ chat, operators, squads, activeOp, onSend, cheers, onCheer }) {
     </div>
   );
 }
-
