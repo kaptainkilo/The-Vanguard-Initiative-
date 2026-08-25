@@ -849,6 +849,8 @@ function CodexIconRow({ iconRef, size }) {
         if (type === 'specialty') return <SpecialtyBadge key={i} specialization={parts[1]} size={s} />;
         if (type === 'award') return <AwardRibbon key={i} awardType={parts[1]} size={s} />;
         if (type === 'enemy') return <EnemyIcon key={i} faction={parts[1]} size={s} />;
+        if (type === 'character') return <CharacterIcon key={i} character={parts[1]} size={s} />;
+        if (type === 'vanguard') return <VanguardIcon key={i} size={s} />;
         return null;
       })}
     </div>
@@ -863,6 +865,7 @@ const ENEMY_ICON_PATHS = {
   kharvax: './Images/Enemyicons/kharvaxicon.png',
   voss: './Images/Enemyicons/vossicon.png',
   skarn: './Images/Enemyicons/skarnicon.png',
+  renders: './Images/Enemyicons/rendersicon.png',
 };
 function EnemyIcon({ faction, size }) {
   const s = size || 44;
@@ -870,6 +873,44 @@ function EnemyIcon({ faction, size }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return null;
   return <img src={src} width={s} height={s} style={{borderRadius:'50%',objectFit:'cover',border:'2px solid var(--amber-dim)'}} onError={()=>setFailed(true)} alt={faction} />;
+}
+
+const CHARACTER_ICON_PATHS = {
+  kilo: './Images/character/kilo.png',
+  anvil: './Images/character/Anvil.png',
+};
+function CharacterIcon({ character, size }) {
+  const s = size || 44;
+  const src = CHARACTER_ICON_PATHS[(character||'').toLowerCase()];
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return null;
+  return <img src={src} width={s} height={s} style={{borderRadius:'50%',objectFit:'cover',border:'2px solid var(--amber-dim)'}} onError={()=>setFailed(true)} alt={character} />;
+}
+
+const VANGUARD_ICON_PATHS = {
+  vanguard: './Images/vangaurd/vangaurdicon.png',
+};
+function VanguardIcon({ size }) {
+  const s = size || 44;
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return <img src={VANGUARD_ICON_PATHS.vanguard} width={s} height={s} style={{borderRadius:'50%',objectFit:'cover',border:'2px solid var(--amber-dim)'}} onError={()=>setFailed(true)} alt="Vanguard Initiative" />;
+}
+
+// Wide banner images, distinct from the small circular icons above — a
+// separate visual surface (full-width header art), not another icon size.
+const BANNER_PATHS = {
+  kharvax: './Images/banners/kharvaxbanner.png',
+  voss: './Images/banners/vossbanner.png',
+  skarn: './Images/banners/skarnbanner.png',
+  renders: './Images/banners/rendersbanner.png',
+  vanguard: './Images/vangaurd/vangaurdbanner.png',
+};
+function CodexBanner({ bannerRef }) {
+  const src = BANNER_PATHS[(bannerRef||'').toLowerCase()];
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return null;
+  return <img src={src} style={{width:'100%',borderRadius:2,marginBottom:12,display:'block'}} onError={()=>setFailed(true)} alt="" />;
 }
 
 function SpecialtyBadge({ specialization, size }) {
