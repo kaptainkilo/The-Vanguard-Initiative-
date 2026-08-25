@@ -77,7 +77,7 @@ function chatToRow(m) {
   return { author_id: m.authorId, author_name: m.authorName, is_command: m.isCommand, text: m.text, timestamp: m.timestamp, channel: m.channel || 'main', squad_id: m.squadId || null };
 }
 function rowToHabit(h) { return { id: h.id, name: h.name, active: h.active, createdDate: h.created_date, category: h.category || 'Other' }; }
-function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body, iconRef: c.icon_ref || '' }; }
+function rowToCodex(c) { return { id: c.id, category: c.category, title: c.title, body: c.body, iconRef: c.icon_ref || '', bannerRef: c.banner_ref || '' }; }
 function rowToQuip(q) { return { id: q.id, text: q.text }; }
 function rowToChallenge(c) { return { id: c.id, name: c.name, muscleGroup: c.muscle_group, target: Number(c.target), unit: c.unit }; }
 function rowToChallengeCompletion(c) { return { id: c.id, operatorId: c.operator_id, date: c.date, poolId: c.pool_id }; }
@@ -260,6 +260,7 @@ function Onboarding({ op, onComplete }) {
       <div className="login-wrap">
         <div className="login-card" style={{maxWidth:600}}>
           <div className="panel">
+            <CodexBanner bannerRef="vanguard" />
             <div className="bracket-label">Vanguard Codex — World Briefing</div>
             <div style={{fontSize:12,lineHeight:1.7,color:'var(--text-dim)',marginBottom:16}}>{DEFAULT_CODEX_ENTRIES[0].body}</div>
             <div style={{fontSize:11,color:'var(--text-dim)'}}>Full lore, planet, and enemy intel available anytime in the Codex tab once you're activated.</div>
@@ -555,4 +556,3 @@ async function fetchAllData() {
 
   return { ops, camps, lgs, ch, cx, squads, exercises, protocolSessions, quips, awards, personalRecords, raidTemplates, raidInstances, campaignPOIs, challengePool, challengeCompletions, seasons, duels, announcements, dismissals, cheers, squadHabitChallenges, squadHabitOptIns, squadHabitCheckins, joinRequests, quadrants, sectors, systems, planets, moons, asteroidBelts, deepVoidFeatures };
 }
-
