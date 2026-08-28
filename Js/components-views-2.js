@@ -372,12 +372,69 @@ function LogActivity({ deployedCampaign, activeOp, logs, addLogs, campaigns, exe
   );
 }
 
-function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, personalRecords, onUpdateOperator, onUploadAvatar, onSetBirthdate }) {
+function MuscleFatigueGauge({ x, y, entry }) {
+  const color = fatigueColor(entry.status);
+  const pct = entry.daysSince===null ? 0 : Math.min(100, (7-Math.min(entry.daysSince,7))/7*100);
+  const r = 13;
+  const circumference = 2*Math.PI*r;
+  const dashOffset = circumference * (1 - pct/100);
+  return (
+    <g transform={"translate("+x+","+y+")"}>
+      <circle r={r} fill="var(--panel)" stroke="var(--border)" strokeWidth="2" />
+      <circle r={r} fill="none" stroke={color} strokeWidth="3" strokeDasharray={circumference} strokeDashoffset={dashOffset} transform="rotate(-90)" />
+      <text y="3" textAnchor="middle" fontSize="8" fill={color} fontFamily="'IBM Plex Mono',monospace">{entry.daysSince===null?'\u2014':entry.daysSince}</text>
+      <text y="24" textAnchor="middle" fontSize="8" fill="var(--text-dim)" fontFamily="'IBM Plex Mono',monospace">{entry.muscleGroup}</text>
+    </g>
+  );
+}
+function MuscleFatigueSilhouette({ fatigue }) {
+  const byGroup = {};
+  fatigue.forEach(f => { byGroup[f.muscleGroup] = f; });
+  // Groups with a sensible front-view anatomical spot get a gauge on the
+  // silhouette. Back, Hamstrings, and Glutes don't have one from the
+  // front — those render as a small supplementary strip below instead of
+  // forcing them onto a body facing the wrong way.
+  const frontPositions = [
+    ['Cardio', 120, 38], ['Shoulders', 168, 76], ['Chest', 120, 96],
+    ['Biceps', 172, 118], ['Triceps', 68, 118], ['Core', 120, 142],
+    ['Grip', 176, 172], ['Quadriceps', 100, 232], ['Calves', 100, 322],
+  ];
+  const posteriorGroups = ['Back', 'Hamstrings', 'Glutes'];
+  return (
+    <div>
+      <svg width="100%" viewBox="0 0 240 360" style={{maxWidth:280,display:'block',margin:'0 auto',background:'#05070d',borderRadius:4}}>
+        {/* simplified body outline */}
+        <circle cx="120" cy="26" r="16" fill="none" stroke="var(--border)" strokeWidth="1.5" />
+        <path d="M 90 50 L 150 50 L 160 70 L 150 175 L 90 175 L 80 70 Z" fill="none" stroke="var(--border)" strokeWidth="1.5" />
+        <path d="M 90 58 L 55 120 L 62 170 L 75 168 L 72 122 L 95 78 Z" fill="none" stroke="var(--border)" strokeWidth="1.5" />
+        <path d="M 150 58 L 185 120 L 178 170 L 165 168 L 168 122 L 145 78 Z" fill="none" stroke="var(--border)" strokeWidth="1.5" />
+        <path d="M 92 175 L 118 175 L 112 340 L 90 340 Z" fill="none" stroke="var(--border)" strokeWidth="1.5" />
+        <path d="M 148 175 L 122 175 L 128 340 L 150 340 Z" fill="none" stroke="var(--border)" strokeWidth="1.5" />
+        {frontPositions.map(([name,x,y]) => byGroup[name] ? <MuscleFatigueGauge key={name} x={x} y={y} entry={byGroup[name]} /> : null)}
+      </svg>
+      <div className="dim mono" style={{fontSize:10,marginTop:10,marginBottom:6,letterSpacing:'0.05em',textAlign:'center'}}>POSTERIOR CHAIN (NOT SHOWN ABOVE)</div>
+      <div style={{display:'flex',justifyContent:'center',gap:16}}>
+        {posteriorGroups.map(name => byGroup[name] ? (
+          <div key={name} style={{textAlign:'center'}}>
+            <div style={{fontSize:11,color:fatigueColor(byGroup[name].status)}}>{byGroup[name].status}</div>
+            <div className="dim mono" style={{fontSize:9}}>{name}{byGroup[name].daysSince!==null ? ' · '+byGroup[name].daysSince+'d' : ''}</div>
+          </div>
+        ) : null)}
+      </div>
+    </div>
+  );
+}
+function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, personalRecords, onUpdateOperator, onUploadAvatar, onSetBirthdate, onRedeemCode, onPurchaseCosmetic }) {
   const [pickingSpec, setPickingSpec] = useState(false);
   const [retesting, setRetesting] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [birthdateDraft, setBirthdateDraft] = useState('');
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemBusy, setRedeemBusy] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState(null);
+  const [purchaseBusyKey, setPurchaseBusyKey] = useState(null);
+  const [purchaseMsg, setPurchaseMsg] = useState(null);
   const [realNameDraft, setRealNameDraft] = useState(op ? (op.realName||'') : '');
   useEffect(() => { if (op) setRealNameDraft(op.realName||''); }, [op && op.id]);
   if (!op) return null;
@@ -521,6 +578,79 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
           <div className="field-row"><span className="field-label">ID</span><span className="mono">{op.idNum}</span></div>
           <div className="field-row"><span className="field-label">Join Date</span><span>{op.joinDate}</span></div>
           <div className="field-row"><span className="field-label">Age Division</span><span className="pill">{shouldHidePersonalInfo ? '\u2014 Redacted \u2014' : op.ageDivision}</span></div>
+          {isOwnProfile && <div className="field-row"><span className="field-label">Requisition Credits</span><span className="stat-val mono">{op.requisitionCredits||0}</span></div>}
+          {isOwnProfile && (
+            <div className="field-row">
+              <span className="field-label">Redeem Code</span>
+              <span style={{display:'flex',gap:6,alignItems:'center'}}>
+                <input type="text" value={redeemInput} onChange={e=>{setRedeemInput(e.target.value.toUpperCase()); setRedeemMsg(null);}} placeholder="VANG-XXXXXXXX" style={{fontSize:11,width:140}} />
+                <button className="ghost small" disabled={redeemBusy || !redeemInput.trim()} onClick={async ()=>{
+                  setRedeemBusy(true);
+                  const result = await onRedeemCode(redeemInput);
+                  setRedeemBusy(false);
+                  setRedeemMsg(result);
+                  if (result && result.success) setRedeemInput('');
+                }}>{redeemBusy ? 'Checking...' : 'Redeem'}</button>
+              </span>
+            </div>
+          )}
+          {isOwnProfile && redeemMsg && (
+            <div className="field-row">
+              <span></span>
+              <span style={{fontSize:11,color: redeemMsg.success?'var(--success)':'var(--threat)'}}>
+                {redeemMsg.success ? ('+'+redeemMsg.credits+' Requisition Credits.') : (redeemMsg.message||'Redemption failed.')}
+              </span>
+            </div>
+          )}
+          {isOwnProfile && (
+            <div style={{marginTop:20}}>
+              <div className="bracket-label">Cosmetics Shop</div>
+              <div className="dim" style={{fontSize:11,marginBottom:12}}>Customize how your chat messages appear. Spend Requisition Credits below.</div>
+              {['color','border','background'].map(cat => (
+                <div key={cat} style={{marginBottom:16}}>
+                  <div className="dim mono" style={{fontSize:10,marginBottom:8,letterSpacing:'0.05em'}}>{cat.toUpperCase()}</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                    {Object.entries(COSMETIC_CATALOG).filter(([k,item])=>item.category===cat).map(([key,item]) => {
+                      const owned = (op.ownedCosmetics||[]).includes(key);
+                      const equippedField = cat==='color'?'equippedChatColor':cat==='border'?'equippedChatBorder':'equippedChatBackground';
+                      const isEquipped = op[equippedField] === key;
+                      const swatchStyle = cat==='color'
+                        ? {background:'var(--panel)',color:item.value,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11}
+                        : cat==='border'
+                        ? {border:item.value,background:'var(--panel)'}
+                        : {background:item.value};
+                      return (
+                        <div key={key} style={{border:'1px solid var(--border)',borderRadius:2,padding:8,width:140}}>
+                          <div style={Object.assign({height:24,borderRadius:2,marginBottom:6},swatchStyle)}>{cat==='color' ? 'Aa' : ''}</div>
+                          <div style={{fontSize:11,fontWeight:600}}>{item.label}</div>
+                          <div className="dim mono" style={{fontSize:10,marginBottom:6}}>{item.price} credits</div>
+                          {owned ? (
+                            <button className={isEquipped?'primary small':'ghost small'} style={{width:'100%'}} onClick={()=>onUpdateOperator(Object.assign({},op,{[equippedField]: isEquipped ? null : key}))}>
+                              {isEquipped ? 'Equipped' : 'Equip'}
+                            </button>
+                          ) : (
+                            <button className="ghost small" style={{width:'100%'}} disabled={purchaseBusyKey===key || (op.requisitionCredits||0) < item.price} onClick={async ()=>{
+                              setPurchaseBusyKey(key);
+                              const result = await onPurchaseCosmetic(key);
+                              setPurchaseBusyKey(null);
+                              setPurchaseMsg(result);
+                            }}>
+                              {purchaseBusyKey===key ? 'Buying...' : 'Buy'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {purchaseMsg && (
+                <div style={{fontSize:11,color: purchaseMsg.success?'var(--success)':'var(--threat)',marginBottom:8}}>
+                  {purchaseMsg.success ? 'Purchased.' : (purchaseMsg.message||'Purchase failed.')}
+                </div>
+              )}
+            </div>
+          )}
           {isOwnProfile && (
             <div className="field-row">
               <span className="field-label">Hide Name & Age from Others</span>
@@ -568,15 +698,7 @@ function Dossier({ op, activeOpId, operators, campaigns, logs, squads, awards, p
       <div className="panel" style={{marginTop:0}}>
         <div className="bracket-label">Muscle Fatigue</div>
         <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:14}}>Based on when each muscle group was last trained. Fatigued = trained yesterday or today. Neglected = 7+ days since last hit.</div>
-        {computeMuscleFatigue(op.id, logs).map(f => (
-          <div key={f.muscleGroup} style={{marginBottom:10}}>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:3}}>
-              <span>{f.muscleGroup}</span>
-              <span style={{color:fatigueColor(f.status)}}>{f.status}{f.daysSince!==null ? ' · '+f.daysSince+'d ago' : ''}</span>
-            </div>
-            <div className="bar-track"><div className="bar-fill" style={{width:(f.daysSince===null?0:Math.min(100,(7-Math.min(f.daysSince,7))/7*100))+'%', background:fatigueColor(f.status)}}></div></div>
-          </div>
-        ))}
+        <MuscleFatigueSilhouette fatigue={computeMuscleFatigue(op.id, logs)} />
       </div>
 
       <div className="panel" style={{marginTop:0}}>
@@ -798,8 +920,13 @@ function Comms({ chat, operators, squads, activeOp, onSend, cheers, onCheer }) {
         {shown.map(m => {
           const msgCheers = (cheers||[]).filter(c=>c.messageId===m.id);
           const iCheered = msgCheers.some(c=>c.operatorId===activeOp.id);
+          const sender = operators.find(o=>o.id===m.authorId);
+          const cosmeticStyle = {};
+          if (sender && sender.equippedChatColor && COSMETIC_CATALOG[sender.equippedChatColor]) cosmeticStyle.color = COSMETIC_CATALOG[sender.equippedChatColor].value;
+          if (sender && sender.equippedChatBorder && COSMETIC_CATALOG[sender.equippedChatBorder]) cosmeticStyle.border = COSMETIC_CATALOG[sender.equippedChatBorder].value;
+          if (sender && sender.equippedChatBackground && COSMETIC_CATALOG[sender.equippedChatBackground]) cosmeticStyle.background = COSMETIC_CATALOG[sender.equippedChatBackground].value;
           return (
-            <div key={m.id} className={"chat-msg "+(m.isCommand?'command':(m.authorId===activeOp.id?'mine':'theirs'))}>
+            <div key={m.id} className={"chat-msg "+(m.isCommand?'command':(m.authorId===activeOp.id?'mine':'theirs'))} style={cosmeticStyle}>
               <div className="chat-meta">{!m.authorId ? 'VAL // AUTOMATED' : (m.isCommand ? 'COMMAND TRANSMISSION' : m.authorName)} · {new Date(m.timestamp).toLocaleString()}</div>
               <div>{m.text}</div>
               {m.isCommand && (
