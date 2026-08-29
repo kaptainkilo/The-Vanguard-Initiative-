@@ -516,10 +516,11 @@ function App() {
   async function grantRequisitionCreditsAdmin(operatorId, amount) {
     const target = operators.find(o=>o.id===operatorId);
     if (!target || !amount) return { success:false, message:'Missing operator or amount.' };
-    const { error } = await sb.from('profiles').update({ requisition_credits: (target.requisitionCredits||0) + Number(amount) }).eq('id', operatorId);
+    const { data, error } = await sb.from('profiles').update({ requisition_credits: (target.requisitionCredits||0) + Number(amount) }).eq('id', operatorId).select();
     if (error) return { success:false, message: error.message };
+    if (!data || data.length === 0) return { success:false, message:'Update ran but affected zero rows \u2014 likely blocked by a Row Level Security policy on profiles, not a genuine error.' };
     await refetchAll();
-    return { success:true };
+    return { success:true, newBalance: data[0].requisition_credits };
   }
   async function generateRedemptionCode(credits) {
     // Excludes visually ambiguous characters (0/O, 1/I) since these get
