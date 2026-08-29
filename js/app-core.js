@@ -515,9 +515,11 @@ function App() {
   }
   async function grantRequisitionCreditsAdmin(operatorId, amount) {
     const target = operators.find(o=>o.id===operatorId);
-    if (!target || !amount) return;
-    await sb.from('profiles').update({ requisition_credits: (target.requisitionCredits||0) + Number(amount) }).eq('id', operatorId);
+    if (!target || !amount) return { success:false, message:'Missing operator or amount.' };
+    const { error } = await sb.from('profiles').update({ requisition_credits: (target.requisitionCredits||0) + Number(amount) }).eq('id', operatorId);
+    if (error) return { success:false, message: error.message };
     await refetchAll();
+    return { success:true };
   }
   async function generateRedemptionCode(credits) {
     // Excludes visually ambiguous characters (0/O, 1/I) since these get
