@@ -64,6 +64,8 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
   const [grantAwardDraft, setGrantAwardDraft] = useState({title:'', description:''});
   const [creditsFor, setCreditsFor] = useState(null);
   const [creditsAmount, setCreditsAmount] = useState('');
+  const [creditsMsg, setCreditsMsg] = useState(null);
+  const [codeGenMsg, setCodeGenMsg] = useState(null);
   const [codeAmount, setCodeAmount] = useState('');
   const [generatedCodes, setGeneratedCodes] = useState([]);
   const [codeBusy, setCodeBusy] = useState(false);
@@ -568,13 +570,15 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
           <div style={{border:'1px solid var(--amber)',borderRadius:2,padding:12,marginTop:14}}>
             <div className="field"><label>Amount</label><input type="number" value={creditsAmount} onChange={e=>setCreditsAmount(e.target.value)} placeholder="e.g. 250" /></div>
             <div style={{display:'flex',gap:8,marginTop:10}}>
-              <button className="primary small" onClick={()=>{
+              <button className="primary small" onClick={async ()=>{
                 if (!creditsAmount || Number(creditsAmount)<=0) return;
-                onGrantCredits(creditsFor, Number(creditsAmount));
-                setCreditsFor(null); setCreditsAmount('');
+                const result = await onGrantCredits(creditsFor, Number(creditsAmount));
+                setCreditsMsg(result);
+                if (result && result.success) { setCreditsFor(null); setCreditsAmount(''); }
               }}>Grant</button>
-              <button className="ghost small" onClick={()=>{setCreditsFor(null); setCreditsAmount('');}}>Cancel</button>
+              <button className="ghost small" onClick={()=>{setCreditsFor(null); setCreditsAmount(''); setCreditsMsg(null);}}>Cancel</button>
             </div>
+            {creditsMsg && !creditsMsg.success && <div style={{fontSize:11,color:'var(--threat)',marginTop:8}}>{creditsMsg.message||'Grant failed.'}</div>}
           </div>
         )}
       </div>
@@ -589,10 +593,11 @@ function AdminPanel({ operators, campaigns, logs, onUpdateOperators, onUpdateCam
             setCodeBusy(true);
             const result = await onGenerateCode(Number(codeAmount));
             setCodeBusy(false);
-            if (result.code) setGeneratedCodes([{code:result.code, credits:Number(codeAmount)}, ...generatedCodes]);
-            setCodeAmount('');
+            setCodeGenMsg(result.error ? result : null);
+            if (result.code) { setGeneratedCodes([{code:result.code, credits:Number(codeAmount)}, ...generatedCodes]); setCodeAmount(''); }
           }}>{codeBusy ? 'Generating...' : 'Generate'}</button>
         </div>
+        {codeGenMsg && codeGenMsg.error && <div style={{fontSize:11,color:'var(--threat)',marginBottom:10}}>{codeGenMsg.error}</div>}
         {generatedCodes.length > 0 && (
           <div>
             <div className="dim mono" style={{fontSize:10,marginBottom:8,letterSpacing:'0.05em'}}>GENERATED THIS SESSION</div>
