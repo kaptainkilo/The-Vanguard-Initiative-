@@ -13,6 +13,7 @@ function rowToOperator(p, habits) {
     adminSince: p.admin_since || null, moderatorSince: p.moderator_since || null,
     featuredAwardId: p.featured_award_id || null, lastSeenStatus: p.last_seen_status || null,
     birthdate: p.birthdate || null, hidePersonalInfo: p.hide_personal_info !== false,
+    requisitionCredits: p.requisition_credits || 0, creditsAwardsBaseline: p.credits_awards_baseline || 0,
     ownedCosmetics: p.owned_cosmetics || [], equippedChatColor: p.equipped_chat_color || null,
     equippedChatBorder: p.equipped_chat_border || null, equippedChatBackground: p.equipped_chat_background || null,
   };
@@ -24,6 +25,7 @@ const OP_FIELD_MAP = { realName:'real_name', ageDivision:'age_division', special
   lastSeenRank:'last_seen_rank', customProtocols:'custom_protocols', callsign:'callsign',
   adminSince:'admin_since', moderatorSince:'moderator_since', featuredAwardId:'featured_award_id', lastSeenStatus:'last_seen_status',
   birthdate:'birthdate', hidePersonalInfo:'hide_personal_info',
+  requisitionCredits:'requisition_credits', creditsAwardsBaseline:'credits_awards_baseline',
   equippedChatColor:'equipped_chat_color', equippedChatBorder:'equipped_chat_border', equippedChatBackground:'equipped_chat_background' };
 function operatorToRowPatch(patch) {
   const row = {};
